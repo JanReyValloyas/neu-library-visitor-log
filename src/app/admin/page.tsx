@@ -74,7 +74,6 @@ export default function AdminDashboard() {
   }, [visits]);
 
   const chartData = useMemo(() => {
-    // Mock data for weekly trajectory
     return [
       { date: 'Mon', count: 120 },
       { date: 'Tue', count: 150 },
@@ -114,7 +113,7 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen pb-20">
+    <div className="flex flex-col min-h-screen pb-20 bg-[#f5f8f5]">
       <header className="p-6 flex items-center justify-between bg-white border-b sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-[#006600] rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-md">
@@ -137,7 +136,7 @@ export default function AdminDashboard() {
       </header>
 
       <main className="p-4 space-y-6 animate-in fade-in duration-500">
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 gap-4">
           <Card className="rounded-2xl border-none shadow-md overflow-hidden bg-white">
             <CardContent className="p-6 flex items-center justify-between">
               <div className="space-y-1">
