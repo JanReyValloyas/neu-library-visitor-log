@@ -58,13 +58,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
-    if (!auth || !db) {
-      console.log("Auth or DB not initialized yet");
-      return;
-    }
+    if (!auth || !db) return;
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log("Auth state changed:", firebaseUser?.email || "No user");
+      console.log("Auth State:", firebaseUser ? `Logged in as ${firebaseUser.email}` : "Logged out");
       
       if (firebaseUser) {
         setUser(firebaseUser);
@@ -73,7 +70,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           const userDoc = await getDoc(userDocRef);
 
           if (!userDoc.exists()) {
-            console.log("Creating new user profile...");
             const newProfile: UserProfile = {
               uid: firebaseUser.uid,
               email: firebaseUser.email || "",
@@ -87,27 +83,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             setProfile(newProfile);
           } else {
             const data = userDoc.data() as UserProfile;
-            console.log("Existing profile loaded. Role:", data.role);
-            
             if (data.isBlocked) {
-              console.warn("User is blocked, signing out...");
               await signOut(auth);
               toast({
-                title: "Access Denied",
-                description: "Your account has been blocked. Please contact the administrator.",
+                title: "Account Blocked",
+                description: "Access denied. Contact administrator.",
                 variant: "destructive",
               });
               setUser(null);
               setProfile(null);
-              router.push("/");
-              setLoading(false);
-              return;
+            } else {
+              setProfile(data);
             }
-            setProfile(data);
           }
         } catch (err) {
-          console.error("Error fetching/creating profile:", err);
-          toast({ title: "Auth Error", description: "Failed to load user profile.", variant: "destructive" });
+          console.error("Profile Fetch Error:", err);
         }
       } else {
         setUser(null);
@@ -117,60 +107,48 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     return () => unsubscribeAuth();
-  }, [auth, db, router]);
+  }, [auth, db]);
 
-  // Real-time profile updates (essential for role changes or blocks)
+  // Real-time updates for blocked status or role changes
   useEffect(() => {
     if (user && db && auth) {
       const unsubscribeProfile = onSnapshot(doc(db, "users", user.uid), (doc) => {
         if (doc.exists()) {
           const data = doc.data() as UserProfile;
+          setProfile(data);
           if (data.isBlocked) {
             signOut(auth);
             router.push("/");
           }
-          setProfile(data);
         }
       }, (error) => {
-        console.error("Profile snapshot error:", error);
+        console.error("Profile Real-time Error:", error);
       });
       return () => unsubscribeProfile();
     }
   }, [user, db, auth, router]);
 
-  // Route protection and redirection logic
+  // Route guarding
   useEffect(() => {
     if (!loading) {
+      const isPublicRoute = pathname === "/";
       const isAdminRoute = pathname.startsWith("/admin");
       const isDashboardRoute = pathname.startsWith("/dashboard");
       const isProfileRoute = pathname.startsWith("/complete-profile");
-      const isLoginRoute = pathname === "/";
 
-      if (user && profile) {
-        // 1. Force profile completion
+      if (!user) {
+        if (!isPublicRoute) router.push("/");
+      } else if (profile) {
+        // Force profile completion if basic info is missing
         if (!profile.program && !isProfileRoute && !isAdminRoute) {
-          console.log("Redirecting to complete-profile");
           router.push("/complete-profile");
-          return;
-        }
-
-        // 2. Role-based redirection
-        if (profile.role === "admin") {
-          if (isDashboardRoute || isLoginRoute) {
-            console.log("Admin logged in, redirecting to /admin");
-            router.push("/admin");
-          }
+        } else if (profile.role === "admin") {
+          // Admins on user dashboard or login are sent to admin dashboard
+          if (isDashboardRoute || isPublicRoute) router.push("/admin");
         } else {
-          // Regular user
-          if (isAdminRoute || isLoginRoute) {
-            console.log("User logged in, redirecting to /dashboard");
-            router.push("/dashboard");
-          }
+          // Regular users on admin routes or login are sent to user dashboard
+          if (isAdminRoute || isPublicRoute) router.push("/dashboard");
         }
-      } else if (!isLoginRoute) {
-        // Not logged in, and not on login page
-        console.log("Not logged in, redirecting to /");
-        router.push("/");
       }
     }
   }, [user, profile, loading, pathname, router]);
