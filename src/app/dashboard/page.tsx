@@ -1,67 +1,53 @@
-
 "use client";
 
-import { useEffect, useState } from "react";
-import { Navbar } from "@/components/navbar";
+import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useFirestore } from "@/firebase";
-import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp } from "firebase/firestore";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Calendar, BookOpen } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ArrowLeft, ArrowRight, CheckCircle2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import Image from "next/image";
+import { PlaceHolderImages } from "@/lib/placeholder-images";
 
-const reasons = ["Reading", "Researching", "Use of Computer", "Meeting", "Borrowing Books", "Other"];
+const reasons = [
+  "Reading",
+  "Researching",
+  "Use of Computer",
+  "Group Study",
+  "Meeting",
+  "Borrowing Books",
+  "Other"
+];
 
 export default function Dashboard() {
-  const { profile } = useAuth();
+  const { profile, logout } = useAuth();
   const db = useFirestore();
-  const [visits, setVisits] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [isOpen, setIsOpen] = useState(false);
-
-  // Form state
-  const [reason, setReason] = useState("");
+  const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
   const [otherReason, setOtherReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (!profile || !db) return;
-    const q = query(
-      collection(db, "visits"),
-      where("uid", "==", profile.uid),
-      orderBy("timestamp", "desc")
+  const handleToggleReason = (reason: string) => {
+    setSelectedReasons(prev => 
+      prev.includes(reason) ? prev.filter(r => r !== reason) : [...prev, reason]
     );
+  };
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setVisits(data);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [profile, db]);
-
-  const handleLogVisit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCheckIn = async () => {
     if (!profile || !db) return;
-    if (!reason) {
-      toast({ title: "Reason Required", description: "Please select a reason for your visit.", variant: "destructive" });
+    if (selectedReasons.length === 0) {
+      toast({ title: "Selection Required", description: "Please select at least one reason.", variant: "destructive" });
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const finalReason = reason === "Other" ? otherReason : reason;
+      const finalReasons = selectedReasons.map(r => r === "Other" ? `Other: ${otherReason}` : r).join(", ");
       await addDoc(collection(db, "visits"), {
         uid: profile.uid,
         displayName: profile.displayName,
@@ -70,173 +56,112 @@ export default function Dashboard() {
         college: profile.college,
         isEmployee: profile.isEmployee,
         employeeType: profile.employeeType,
-        reason: finalReason,
+        reason: finalReasons,
         timestamp: serverTimestamp(),
         date: format(new Date(), "yyyy-MM-dd"),
       });
 
-      toast({ title: "Visit Logged", description: "Your visit has been successfully recorded." });
-      setIsOpen(false);
-      setReason("");
+      toast({ title: "Check-in Successful", description: "Your visit has been recorded. Enjoy the library!" });
+      setSelectedReasons([]);
       setOtherReason("");
     } catch (error: any) {
-      console.error(error);
-      toast({ title: "Error", description: error.message || "Failed to log visit.", variant: "destructive" });
+      toast({ title: "Error", description: "Could not log your visit.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const filteredVisits = visits.filter(v => 
-    v.reason.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   if (!profile) return null;
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
-      <main className="container mx-auto px-4 py-8 max-w-5xl">
-        <div className="grid gap-8">
-          {/* Welcome Card */}
-          <Card className="overflow-hidden border-none shadow-lg bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
-            <CardContent className="p-8">
-              <div className="flex flex-col md:flex-row items-center gap-6">
-                <Avatar className="h-24 w-24 border-4 border-white/20">
-                  <AvatarImage src={profile.photoURL} referrerPolicy="no-referrer" />
-                  <AvatarFallback className="text-3xl text-primary">{profile.displayName[0]}</AvatarFallback>
-                </Avatar>
-                <div className="text-center md:text-left space-y-2">
-                  <h1 className="text-3xl font-bold font-headline">Welcome to NEU Library!</h1>
-                  <p className="text-primary-foreground/90 text-lg">{profile.displayName}</p>
-                  <div className="flex flex-wrap justify-center md:justify-start gap-2 pt-2">
-                    <Badge variant="secondary" className="bg-white/10 hover:bg-white/20 text-white border-white/20">
-                      {profile.program}
-                    </Badge>
-                    <Badge variant="secondary" className="bg-white/10 hover:bg-white/20 text-white border-white/20">
-                      {profile.college}
-                    </Badge>
-                  </div>
-                </div>
-                <div className="md:ml-auto">
-                  <Dialog open={isOpen} onOpenChange={setIsOpen}>
-                    <DialogTrigger asChild>
-                      <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90 shadow-xl font-bold px-8">
-                        <Plus className="mr-2 h-5 w-5" />
-                        Log My Visit
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Log Your Library Visit</DialogTitle>
-                        <DialogDescription>
-                          Let us know the purpose of your visit today.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <form onSubmit={handleLogVisit} className="space-y-4 pt-4">
-                        <div className="space-y-2">
-                          <Label>Reason for visit</Label>
-                          <Select onValueChange={setReason} value={reason}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select reason" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {reasons.map(r => (
-                                <SelectItem key={r} value={r}>{r}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        {reason === "Other" && (
-                          <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
-                            <Label>Specify reason</Label>
-                            <Input 
-                              placeholder="Type your reason here..." 
-                              value={otherReason}
-                              onChange={(e) => setOtherReason(e.target.value)}
-                              required
-                            />
-                          </div>
-                        )}
-                        <DialogFooter className="pt-4">
-                          <Button type="submit" className="w-full" disabled={isSubmitting}>
-                            {isSubmitting ? "Logging..." : "Confirm & Log"}
-                          </Button>
-                        </DialogFooter>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Visit History */}
-          <div className="space-y-4">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-              <h2 className="text-2xl font-bold font-headline flex items-center gap-2">
-                <Calendar className="h-6 w-6 text-primary" />
-                Your Visit History
-              </h2>
-              <div className="relative w-full md:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  placeholder="Filter by reason..." 
-                  className="pl-10"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <Card className="border-none shadow-md">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead>Date</TableHead>
-                    <TableHead>Time</TableHead>
-                    <TableHead>Reason</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-center py-8">
-                        Loading history...
-                      </TableCell>
-                    </TableRow>
-                  ) : filteredVisits.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-center py-12 text-muted-foreground">
-                        <div className="flex flex-col items-center gap-2">
-                          <BookOpen className="h-12 w-12 opacity-20" />
-                          <p>No visits found matching your search.</p>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredVisits.map((visit) => (
-                      <TableRow key={visit.id} className="hover:bg-muted/30 transition-colors">
-                        <TableCell className="font-medium">
-                          {visit.date}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {visit.timestamp ? format(visit.timestamp.toDate(), "hh:mm a") : "..."}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="font-normal border-primary/20 bg-primary/5 text-primary">
-                            {visit.reason}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </Card>
+    <div className="flex flex-col min-h-screen pb-24">
+      {/* Header */}
+      <header className="p-4 flex items-center justify-between bg-white border-b sticky top-0 z-10">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => logout()} className="h-8 w-8">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="font-bold text-lg leading-tight">Welcome, {profile.displayName.split(' ')[0]}!</h1>
+            <p className="text-[10px] font-bold text-[#006600] tracking-wider uppercase">PROGRAM: {profile.program}</p>
           </div>
         </div>
-      </main>
+        <Avatar className="h-10 w-10 border-2 border-[#D4AF37]">
+          <AvatarImage src={profile.photoURL} />
+          <AvatarFallback className="bg-[#D4AF37] text-white">{profile.displayName[0]}</AvatarFallback>
+        </Avatar>
+      </header>
+
+      {/* Hero */}
+      <div className="p-4">
+        <div className="relative aspect-[16/9] w-full rounded-2xl overflow-hidden border-2 border-[#D4AF37]/30 shadow-lg">
+          <Image 
+            src={PlaceHolderImages.find(img => img.id === 'library-hero')?.imageUrl || 'https://images.unsplash.com/photo-1507842217343-583bb7270b66?w=800'} 
+            alt="Library"
+            fill
+            className="object-cover"
+          />
+        </div>
+      </div>
+
+      {/* Welcome Section */}
+      <section className="px-6 py-4 space-y-1">
+        <h2 className="text-2xl font-bold text-[#006600]">Welcome to NEU Library!</h2>
+        <p className="text-muted-foreground text-sm">Please select the purpose of your visit today.</p>
+      </section>
+
+      {/* Reasons List */}
+      <section className="px-4 py-2 space-y-4">
+        <div className="flex items-center gap-2 px-2">
+          <CheckCircle2 className="h-5 w-5 text-[#D4AF37]" />
+          <h3 className="font-semibold text-sm">Reason for visit</h3>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3">
+          {reasons.map((reason) => {
+            const isSelected = selectedReasons.includes(reason);
+            return (
+              <div key={reason} className="space-y-3">
+                <div 
+                  onClick={() => handleToggleReason(reason)}
+                  className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer ${
+                    isSelected ? 'border-[#006600] bg-[#006600]/5' : 'border-slate-100 hover:border-slate-200'
+                  }`}
+                >
+                  <Label className="font-medium cursor-pointer">{reason}</Label>
+                  <Checkbox 
+                    checked={isSelected} 
+                    className={`h-6 w-6 rounded-lg transition-colors ${isSelected ? 'bg-[#006600] border-[#006600]' : ''}`}
+                  />
+                </div>
+                {reason === "Other" && isSelected && (
+                  <Input 
+                    placeholder="Specify your reason..." 
+                    className="h-12 border-2 border-[#006600]/20 focus-visible:ring-[#006600]"
+                    value={otherReason}
+                    onChange={(e) => setOtherReason(e.target.value)}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Sticky Footer */}
+      <footer className="sticky-bottom-btn">
+        <Button 
+          onClick={handleCheckIn}
+          disabled={isSubmitting || selectedReasons.length === 0}
+          className="w-full h-14 bg-[#006600] hover:bg-[#004d00] text-white font-bold text-lg rounded-xl shadow-xl flex items-center justify-center gap-2 group"
+        >
+          {isSubmitting ? "Processing..." : "Confirm Check-in"}
+          <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+        </Button>
+        <p className="text-center text-[8px] font-bold text-muted-foreground mt-3 tracking-[0.2em]">
+          NEU LIBRARY MANAGEMENT SYSTEM • 2024
+        </p>
+      </footer>
     </div>
   );
 }

@@ -1,3 +1,10 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "library-hero",
+      "description": "Library bookshelf photo",
+      "imageUrl": "https://images.unsplash.com/photo-1507842217343-583bb7270b66?w=800",
+      "imageHint": "library bookshelf"
+    }
+  ]
 }
