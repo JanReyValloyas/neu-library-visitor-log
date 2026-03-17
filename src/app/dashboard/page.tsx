@@ -11,9 +11,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, PartyPopper } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { format } from "date-fns";
 import Image from "next/image";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import { useRouter } from "next/navigation";
@@ -37,13 +36,13 @@ export default function Dashboard() {
   const [showSuccess, setShowSuccess] = useState(false);
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!loading && !user && !showSuccess) {
       router.replace("/");
     }
     if (!loading && user && profileComplete === false) {
       router.replace("/complete-profile");
     }
-  }, [user, profileComplete, loading, router]);
+  }, [user, profileComplete, loading, router, showSuccess]);
 
   const handleToggleReason = (reason: string) => {
     setSelectedReasons(prev => 
@@ -67,21 +66,25 @@ export default function Dashboard() {
         displayName: user.displayName,
         email: user.email,
         program: profile?.program || "N/A",
-        college: profile?.college || "N/A",
         visitorType: profile?.visitorType || "College Student",
         isEmployee: profile?.visitorType === "Faculty",
-        employeeType: profile?.visitorType === "Faculty" ? profile?.program : "",
         reason: finalReasons,
         timestamp: serverTimestamp(),
-        date: format(new Date(), "yyyy-MM-dd"),
+        date: new Date().toISOString().split("T")[0],
         studentId: profile?.studentId || "N/A",
       });
 
       setShowSuccess(true);
       
+      // Kiosk Mode: Auto sign-out and redirect after 2 seconds
       setTimeout(async () => {
-        await signOut(auth);
-        router.replace("/");
+        try {
+          await signOut(auth);
+          router.replace("/");
+        } catch (err) {
+          console.error("Sign out error:", err);
+          router.replace("/");
+        }
       }, 2000);
 
     } catch (error: any) {
@@ -104,6 +107,7 @@ export default function Dashboard() {
 
   return (
     <div className="flex flex-col min-h-screen pb-32 animate-in fade-in duration-500">
+      {/* Success Overlay */}
       {showSuccess && (
         <div className="fixed inset-0 bg-[#006600] flex flex-col items-center justify-center z-[100] text-white animate-in zoom-in duration-300">
           <div className="text-8xl mb-6">✅</div>
@@ -124,13 +128,13 @@ export default function Dashboard() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="font-bold text-base leading-tight text-slate-800">Welcome, {user.displayName?.split(' ')[0]}!</h1>
+            <h1 className="font-bold text-base leading-tight text-slate-800">Welcome, {user?.displayName?.split(' ')[0]}!</h1>
             <p className="text-[10px] font-bold text-[#006600] tracking-wider uppercase">LIBRARY PORTAL • {profile?.program?.toUpperCase() || 'USER'}</p>
           </div>
         </div>
         <Avatar className="h-10 w-10 border-2 border-[#D4AF37] shadow-sm">
-          <AvatarImage src={user.photoURL || ""} />
-          <AvatarFallback className="bg-[#D4AF37] text-white font-bold">{user.displayName?.charAt(0)}</AvatarFallback>
+          <AvatarImage src={user?.photoURL || ""} />
+          <AvatarFallback className="bg-[#D4AF37] text-white font-bold">{user?.displayName?.charAt(0)}</AvatarFallback>
         </Avatar>
       </header>
 
