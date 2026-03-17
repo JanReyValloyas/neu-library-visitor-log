@@ -1,3 +1,4 @@
+
 "use client";
 import { useState, useEffect } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
@@ -7,6 +8,7 @@ import { auth, db } from "@/firebase/index";
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<string | null>(null);
+  const [profileComplete, setProfileComplete] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,34 +24,41 @@ export function useAuth() {
               await auth.signOut();
               setUser(null);
               setRole(null);
+              setProfileComplete(null);
               setLoading(false);
               return;
             }
             setRole(data.role ?? "user");
+            setProfileComplete(data.profileComplete === true);
           } else {
-            await setDoc(userRef, {
+            const newProfile = {
               uid: firebaseUser.uid,
               email: firebaseUser.email,
               displayName: firebaseUser.displayName,
               photoURL: firebaseUser.photoURL,
               role: "user",
               isBlocked: false,
+              profileComplete: false,
               createdAt: serverTimestamp(),
-            });
+            };
+            await setDoc(userRef, newProfile);
             setRole("user");
+            setProfileComplete(false);
           }
         } catch (e) {
-          console.error(e);
+          console.error("Auth Hook Error:", e);
           setRole("user");
+          setProfileComplete(false);
         }
       } else {
         setUser(null);
         setRole(null);
+        setProfileComplete(null);
       }
       setLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
-  return { user, role, loading };
+  return { user, role, profileComplete, loading };
 }

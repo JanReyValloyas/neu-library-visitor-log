@@ -23,4 +23,5 @@ export const COLLEGES = [
   { college: "Integrated School - TVL Track", departments: ["ICT", "Home Economics"] },
   { college: "Integrated School - Arts and Design Track", departments: ["Media/Visual Arts", "Literary/Theater Arts", "Music"] },
   { college: "NEUVLE +5", departments: ["NEUVLE"] },
+  { college: "Faculty / Staff", departments: ["Administration", "Faculty", "Non-Teaching Staff"] },
 ];

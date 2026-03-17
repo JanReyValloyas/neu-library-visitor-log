@@ -1,25 +1,29 @@
+
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { auth } from "@/firebase/index";
 import { useAuth } from "@/hooks/useAuth";
+import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
-  const { user, role, loading } = useAuth();
+  const { user, role, profileComplete, loading } = useAuth();
   const router = useRouter();
   const [signingIn, setSigningIn] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!loading && user && role) {
-      if (role === "admin") {
+      if (profileComplete === false) {
+        router.replace("/complete-profile");
+      } else if (role === "admin") {
         router.replace("/admin");
       } else {
         router.replace("/dashboard");
       }
     }
-  }, [user, role, loading, router]);
+  }, [user, role, profileComplete, loading, router]);
 
   const handleGoogleSignIn = async () => {
     setSigningIn(true);
@@ -34,10 +38,13 @@ export default function LoginPage() {
     }
   };
 
-  if (loading || (user && role)) {
+  if (loading || (user && role && profileComplete !== null)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f5f8f5]">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#006600] border-t-transparent"></div>
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-10 w-10 animate-spin text-[#006600]" />
+          <p className="text-muted-foreground font-bold text-xs uppercase tracking-widest">Verifying Identity...</p>
+        </div>
       </div>
     );
   }
