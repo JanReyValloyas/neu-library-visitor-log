@@ -1,27 +1,19 @@
-'use client';
+import { initializeApp, getApps } from "firebase/app";
+import { getAuth, browserLocalPersistence, setPersistence } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
-import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getFirestore, Firestore } from 'firebase/firestore';
-import { getAuth, Auth } from 'firebase/auth';
-import { firebaseConfig } from './config';
+const firebaseConfig = {
+  apiKey: "AIzaSyAhhbrwi6LTrZi6IPhOswO-J1hcGeJCCQw",
+  authDomain: "neu-library-visitor-log-46c47.firebaseapp.com",
+  projectId: "neu-library-visitor-log-46c47",
+  storageBucket: "neu-library-visitor-log-46c47.firebasestorage.app",
+  messagingSenderId: "538975536299",
+  appId: "1:538975536299:web:7ad7e7734433ef5a2963ee"
+};
 
-/**
- * Initializes Firebase and returns the core service instances.
- * This is used by the FirebaseClientProvider for application-wide context.
- */
-export function initializeFirebase() {
-  const firebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-  const auth = getAuth(firebaseApp);
-  const firestore = getFirestore(firebaseApp);
-  return { firebaseApp, auth, firestore };
-}
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+const auth = getAuth(app);
+const db = getFirestore(app);
+setPersistence(auth, browserLocalPersistence);
 
-// Initialize singleton instances for direct import in hooks/components
-const instances = initializeFirebase();
-export const auth: Auth = instances.auth;
-export const db: Firestore = instances.firestore;
-
-export * from './provider';
-export * from './auth/use-user';
-export * from './firestore/use-collection';
-export * from './firestore/use-doc';
+export { app, auth, db };
