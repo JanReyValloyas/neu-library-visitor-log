@@ -1,20 +1,49 @@
-
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { db } from "@/firebase/index";
+import { db, auth } from "@/firebase/index";
 import { doc, updateDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
-import { COLLEGES } from "@/lib/colleges";
-import { Loader2 } from "lucide-react";
+import { Loader2, GraduationCap, School, Briefcase } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+const COLLEGE_PROGRAMS = [
+  "Accountancy", "Accounting Information System",
+  "Agriculture", "Economics", "Political Science", 
+  "Biology", "Psychology", "Public Administration",
+  "Financial Management", "Human Resource Development Management",
+  "Legal Management", "Marketing Management", 
+  "Entrepreneurship", "Real Estate Management",
+  "Communication", "Computing Studies", "Criminology",
+  "Secondary Education", "Elementary Education", "Teacher Education",
+  "Civil Engineering", "Electronics Engineering", 
+  "Electrical Engineering", "Industrial Engineering",
+  "Mechanical Engineering", "Architecture", "BS Astronomy",
+  "Law", "Medical Technology", "Medicine", "Midwifery",
+  "Music", "Nursing", "Physical Therapy", 
+  "Respiratory Therapy", "International Relations",
+  "Graduate Studies"
+];
+
+const IS_PROGRAMS = [
+  "GAS", "STEM", "ABM", "HUMSS",
+  "ICT", "Home Economics",
+  "Media/Visual Arts", "Literary/Theater Arts", "Music"
+];
+
+const FACULTY_TYPES = [
+  "Teacher", "Staff", "Administrator", "Librarian"
+];
+
+const YEAR_LEVELS = ["1st", "2nd", "3rd", "4th"];
+
+type VisitorType = "College Student" | "IS Student" | "Faculty";
 
 export default function CompleteProfile() {
   const { user, role, profileComplete, loading } = useAuth();
@@ -22,10 +51,9 @@ export default function CompleteProfile() {
   
   const [fullName, setFullName] = useState("");
   const [studentId, setStudentId] = useState("");
-  const [college, setCollege] = useState("");
+  const [visitorType, setVisitorType] = useState<VisitorType>("College Student");
   const [program, setProgram] = useState("");
-  const [isEmployee, setIsEmployee] = useState(false);
-  const [employeeType, setEmployeeType] = useState("");
+  const [yearLevel, setYearLevel] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -33,35 +61,24 @@ export default function CompleteProfile() {
       router.replace("/");
     }
     if (!loading && user && profileComplete === true) {
-      if (role === "admin") router.replace("/admin");
-      else router.replace("/dashboard");
+      router.replace("/dashboard");
     }
     if (user && !fullName) {
       setFullName(user.displayName || "");
     }
-  }, [user, role, profileComplete, loading, router, fullName]);
-
-  const departments = useMemo(() => {
-    const selected = COLLEGES.find(c => c.college === college);
-    return selected ? selected.departments : [];
-  }, [college]);
-
-  const handleCollegeChange = (val: string) => {
-    setCollege(val);
-    setProgram("");
-  };
+  }, [user, profileComplete, loading, router, fullName]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !db) return;
 
-    if (!fullName || !studentId || !college || !program) {
-      toast({ title: "Validation Error", description: "Please fill in all required fields marked with *.", variant: "destructive" });
+    if (!fullName || !studentId || !program) {
+      toast({ title: "Validation Error", description: "Please fill in all required fields.", variant: "destructive" });
       return;
     }
 
-    if (isEmployee && !employeeType) {
-      toast({ title: "Validation Error", description: "Please select an employee type.", variant: "destructive" });
+    if (visitorType !== "Faculty" && !yearLevel) {
+      toast({ title: "Validation Error", description: "Please select your year level.", variant: "destructive" });
       return;
     }
 
@@ -70,23 +87,26 @@ export default function CompleteProfile() {
       await updateDoc(doc(db, "users", user.uid), {
         displayName: fullName.trim(),
         studentId: studentId.trim(),
-        college,
+        visitorType,
         program,
-        isEmployee,
-        employeeType: isEmployee ? employeeType : "",
+        yearLevel: visitorType !== "Faculty" ? yearLevel : "",
         profileComplete: true,
       });
       
-      toast({ title: "Profile Saved", description: "Your details have been recorded. Welcome to NEU Library!" });
-      
-      if (role === "admin") router.replace("/admin");
-      else router.replace("/dashboard");
+      toast({ title: "Profile Saved", description: "Welcome to NEU Library!" });
+      router.replace("/dashboard");
     } catch (error: any) {
       console.error(error);
-      toast({ title: "Error", description: error.message || "Failed to update profile.", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to update profile.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const getPrograms = () => {
+    if (visitorType === "College Student") return COLLEGE_PROGRAMS;
+    if (visitorType === "IS Student") return IS_PROGRAMS;
+    return FACULTY_TYPES;
   };
 
   if (loading) {
@@ -110,11 +130,38 @@ export default function CompleteProfile() {
           </div>
         </CardHeader>
         <CardContent className="pt-6">
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-3">
+              <Label className="text-xs font-bold uppercase tracking-wider text-slate-600">Visitor Type <span className="text-red-500">*</span></Label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: "College Student", icon: GraduationCap, label: "College" },
+                  { id: "IS Student", icon: School, label: "IS" },
+                  { id: "Faculty", icon: Briefcase, label: "Faculty" }
+                ].map((type) => (
+                  <button
+                    key={type.id}
+                    type="button"
+                    onClick={() => {
+                      setVisitorType(type.id as VisitorType);
+                      setProgram("");
+                    }}
+                    className={cn(
+                      "flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all gap-1",
+                      visitorType === type.id 
+                        ? "bg-[#006600] border-[#006600] text-white shadow-lg" 
+                        : "bg-white border-slate-100 text-slate-500 hover:border-slate-200"
+                    )}
+                  >
+                    <type.icon className="h-5 w-5" />
+                    <span className="text-[10px] font-bold uppercase">{type.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <Label htmlFor="fullName" className="text-xs font-bold uppercase tracking-wider text-slate-600 flex gap-1">
-                Full Name <span className="text-red-500">*</span>
-              </Label>
+              <Label htmlFor="fullName" className="text-xs font-bold uppercase tracking-wider text-slate-600">Full Name <span className="text-red-500">*</span></Label>
               <Input 
                 id="fullName"
                 placeholder="Juan Dela Cruz"
@@ -126,8 +173,8 @@ export default function CompleteProfile() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="studentId" className="text-xs font-bold uppercase tracking-wider text-slate-600 flex gap-1">
-                Student / Employee ID <span className="text-red-500">*</span>
+              <Label htmlFor="studentId" className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                {visitorType === "Faculty" ? "Employee ID" : "Student ID"} <span className="text-red-500">*</span>
               </Label>
               <Input 
                 id="studentId"
@@ -137,69 +184,46 @@ export default function CompleteProfile() {
                 className="h-12 border-slate-200 focus-visible:ring-[#006600] rounded-xl"
                 required
               />
-              <p className="text-[10px] text-muted-foreground font-medium">This ID is used for quick logging at the entrance.</p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="college" className="text-xs font-bold uppercase tracking-wider text-slate-600 flex gap-1">
-                College <span className="text-red-500">*</span>
+              <Label htmlFor="program" className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                {visitorType === "Faculty" ? "Position / Role" : "Academic Program"} <span className="text-red-500">*</span>
               </Label>
-              <Select onValueChange={handleCollegeChange} value={college}>
-                <SelectTrigger id="college" className="h-12 rounded-xl border-slate-200">
-                  <SelectValue placeholder="Select your college" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  {COLLEGES.map((c) => (
-                    <SelectItem key={c.college} value={c.college} className="rounded-lg">{c.college}</SelectItem>
+              <select 
+                id="program"
+                value={program}
+                onChange={(e) => setProgram(e.target.value)}
+                className="w-full h-12 rounded-xl border-2 border-slate-100 bg-white px-4 text-sm font-medium text-slate-700 outline-none focus:border-[#006600] transition-colors appearance-none"
+                required
+              >
+                <option value="">Select your {visitorType === "Faculty" ? "role" : "program"}</option>
+                {getPrograms().map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+
+            {visitorType !== "Faculty" && (
+              <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                <Label className="text-xs font-bold uppercase tracking-wider text-slate-600">Year Level <span className="text-red-500">*</span></Label>
+                <div className="grid grid-cols-4 gap-2">
+                  {YEAR_LEVELS.map((level) => (
+                    <button
+                      key={level}
+                      type="button"
+                      onClick={() => setYearLevel(level)}
+                      className={cn(
+                        "h-10 rounded-xl border-2 font-bold text-xs transition-all",
+                        yearLevel === level 
+                          ? "bg-[#006600] border-[#006600] text-white shadow-md" 
+                          : "bg-white border-slate-100 text-slate-500 hover:border-slate-200"
+                      )}
+                    >
+                      {level}
+                    </button>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="program" className="text-xs font-bold uppercase tracking-wider text-slate-600 flex gap-1">
-                Program / Course <span className="text-red-500">*</span>
-              </Label>
-              <Select onValueChange={setProgram} value={program} disabled={!college}>
-                <SelectTrigger id="program" className="h-12 rounded-xl border-slate-200">
-                  <SelectValue placeholder={college ? "Select your program" : "Select college first"} />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  {departments.map((dept) => (
-                    <SelectItem key={dept} value={dept} className="rounded-lg">{dept}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center justify-between space-x-2 py-4 border border-slate-100 rounded-xl px-4 bg-white shadow-sm">
-              <Label htmlFor="is-employee" className="flex flex-col gap-1 cursor-pointer">
-                <span className="font-bold text-sm text-slate-800">Are you an employee?</span>
-                <span className="font-medium text-[10px] text-muted-foreground uppercase">Faculty, Staff, or Admin</span>
-              </Label>
-              <Switch 
-                id="is-employee" 
-                checked={isEmployee} 
-                onCheckedChange={setIsEmployee} 
-                className="data-[state=checked]:bg-[#006600]"
-              />
-            </div>
-
-            {isEmployee && (
-              <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
-                <Label htmlFor="employee-type" className="text-xs font-bold uppercase tracking-wider text-slate-600 flex gap-1">
-                  Employee Type <span className="text-red-500">*</span>
-                </Label>
-                <Select onValueChange={setEmployeeType} value={employeeType}>
-                  <SelectTrigger id="employee-type" className="h-12 rounded-xl border-slate-200">
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    <SelectItem value="Teacher" className="rounded-lg">Teacher</SelectItem>
-                    <SelectItem value="Staff" className="rounded-lg">Staff</SelectItem>
-                    <SelectItem value="Administrator" className="rounded-lg">Administrator</SelectItem>
-                  </SelectContent>
-                </Select>
+                </div>
               </div>
             )}
 
@@ -208,7 +232,7 @@ export default function CompleteProfile() {
               className="w-full bg-[#006600] hover:bg-[#004d00] text-white font-bold h-14 rounded-xl transition-all shadow-lg mt-4 uppercase tracking-widest text-sm" 
               disabled={isSubmitting}
             >
-              {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : "Save Profile"}
+              {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : "Save Profile & Continue →"}
             </Button>
           </form>
         </CardContent>

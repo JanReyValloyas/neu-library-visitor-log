@@ -2,14 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { db } from "@/firebase/index";
+import { db, auth } from "@/firebase/index";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { signOut } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, PartyPopper } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import Image from "next/image";
@@ -27,16 +28,16 @@ const reasons = [
 ];
 
 export default function Dashboard() {
-  const { user, role, loading } = useAuth();
+  const { user, profileComplete, loading } = useAuth();
   const router = useRouter();
   const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
   const [otherReason, setOtherReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [profile, setProfile] = useState<any>(null);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push("/");
+      router.replace("/");
     }
   }, [user, loading, router]);
 
@@ -65,23 +66,45 @@ export default function Dashboard() {
         date: format(new Date(), "yyyy-MM-dd"),
       });
 
-      toast({ title: "Check-in Successful", description: "Your visit has been recorded. Enjoy the library!" });
-      setSelectedReasons([]);
-      setOtherReason("");
+      setIsSuccess(true);
+      
+      // Wait for 2 seconds, then sign out and redirect
+      setTimeout(async () => {
+        await signOut(auth);
+        router.replace("/");
+      }, 2000);
+
     } catch (error: any) {
       console.error(error);
       toast({ title: "Error", description: "Could not log your visit.", variant: "destructive" });
-    } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (loading || !user) {
+  if (loading || (!user && !isSuccess)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f5f8f5]">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-10 w-10 animate-spin text-[#006600]" />
           <p className="text-muted-foreground animate-pulse font-bold text-xs uppercase tracking-widest">Verifying Identity...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isSuccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f5f8f5] p-6 text-center animate-in fade-in zoom-in duration-500">
+        <div className="space-y-6">
+          <div className="flex justify-center">
+            <div className="h-24 w-24 bg-[#006600] rounded-full flex items-center justify-center shadow-2xl">
+              <PartyPopper className="h-12 w-12 text-white" />
+            </div>
+          </div>
+          <h1 className="text-3xl font-bold text-[#006600]">Visit Logged Successfully!</h1>
+          <p className="text-slate-600 font-medium">Thank you for visiting NEU Library. Your entry has been recorded.</p>
+          <div className="w-12 h-1 bg-[#D4AF37] mx-auto rounded-full animate-pulse" />
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest pt-12">Resetting session for next visitor...</p>
         </div>
       </div>
     );
@@ -159,8 +182,8 @@ export default function Dashboard() {
         </div>
       </section>
 
-      <footer className="sticky-bottom-btn border-t-0 bg-transparent pointer-events-none">
-        <div className="p-4 w-full pointer-events-auto">
+      <footer className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[28rem] p-4 bg-white/80 backdrop-blur-md z-50">
+        <div className="w-full">
           <Button 
             onClick={handleCheckIn}
             disabled={isSubmitting || selectedReasons.length === 0}
