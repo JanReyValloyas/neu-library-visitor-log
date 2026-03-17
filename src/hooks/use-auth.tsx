@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
@@ -49,6 +48,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const logout = async () => {
     if (!auth) return;
     try {
+      localStorage.removeItem('userRole');
       await signOut(auth);
       setUser(null);
       setProfile(null);
@@ -80,6 +80,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             };
             await setDoc(userDocRef, newProfile);
             setProfile(newProfile);
+            localStorage.setItem('userRole', 'user');
           } else {
             const data = userDoc.data() as UserProfile;
             if (data.isBlocked) {
@@ -91,29 +92,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               });
               setUser(null);
               setProfile(null);
+              localStorage.removeItem('userRole');
             } else {
               setProfile(data);
+              localStorage.setItem('userRole', data.role);
             }
           }
         } catch (err) {
           console.error("Profile Fetch Error:", err);
+        } finally {
+          setLoading(false);
         }
       } else {
         setUser(null);
         setProfile(null);
+        setLoading(false);
+        localStorage.removeItem('userRole');
       }
-      setLoading(false);
     });
 
     return () => unsubscribeAuth();
   }, [auth, db]);
 
+  // Real-time listener for profile updates (blocking/role changes)
   useEffect(() => {
     if (user && db && auth) {
       const unsubscribeProfile = onSnapshot(doc(db, "users", user.uid), (doc) => {
         if (doc.exists()) {
           const data = doc.data() as UserProfile;
           setProfile(data);
+          localStorage.setItem('userRole', data.role);
           if (data.isBlocked) {
             signOut(auth);
             router.push("/");
@@ -125,27 +133,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       return () => unsubscribeProfile();
     }
   }, [user, db, auth, router]);
-
-  useEffect(() => {
-    if (!loading) {
-      const isPublicRoute = pathname === "/";
-      const isAdminRoute = pathname.startsWith("/admin");
-      const isDashboardRoute = pathname.startsWith("/dashboard");
-      const isProfileRoute = pathname.startsWith("/complete-profile");
-
-      if (!user) {
-        if (!isPublicRoute) router.push("/");
-      } else if (profile) {
-        if (!profile.program && !isProfileRoute && !isAdminRoute) {
-          router.push("/complete-profile");
-        } else if (profile.role === "admin") {
-          if (isDashboardRoute || isPublicRoute) router.push("/admin");
-        } else {
-          if (isAdminRoute || isPublicRoute) router.push("/dashboard");
-        }
-      }
-    }
-  }, [user, profile, loading, pathname, router]);
 
   return (
     <AuthContext.Provider value={{ user, profile, loading, logout }}>

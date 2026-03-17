@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useFirestore } from "@/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
@@ -9,11 +9,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, ArrowRight, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import Image from "next/image";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
+import { useRouter } from "next/navigation";
 
 const reasons = [
   "Reading",
@@ -26,11 +27,18 @@ const reasons = [
 ];
 
 export default function Dashboard() {
-  const { profile, logout } = useAuth();
+  const { user, profile, loading, logout } = useAuth();
   const db = useFirestore();
+  const router = useRouter();
   const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
   const [otherReason, setOtherReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/");
+    }
+  }, [user, loading, router]);
 
   const handleToggleReason = (reason: string) => {
     setSelectedReasons(prev => 
@@ -71,7 +79,16 @@ export default function Dashboard() {
     }
   };
 
-  if (!profile) return null;
+  if (loading || !user || !profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f5f8f5]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-12 w-12 animate-spin text-[#006600]" />
+          <p className="text-muted-foreground animate-pulse font-medium">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen pb-24">

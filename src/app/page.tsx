@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -14,14 +13,26 @@ import { LogIn, Loader2, ArrowRight, Shield, CreditCard } from "lucide-react";
 import { useAuth, UserProfile } from "@/hooks/use-auth";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
-  const { loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const auth = useAuthInstance();
   const db = useFirestore();
+  const router = useRouter();
   const [redirecting, setRedirecting] = useState(false);
   const [rfid, setRfid] = useState("");
   const [isLoggingId, setIsLoggingId] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && user && profile) {
+      if (profile.role === 'admin') {
+        router.push('/admin');
+      } else {
+        router.push('/dashboard');
+      }
+    }
+  }, [user, profile, authLoading, router]);
 
   useEffect(() => {
     if (!auth) return;
@@ -127,12 +138,12 @@ export default function Home() {
     }
   };
 
-  if (authLoading || redirecting) {
+  if (authLoading || redirecting || (user && profile)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f5f8f5]">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-12 w-12 animate-spin text-[#006600]" />
-          <p className="text-muted-foreground animate-pulse font-medium">Authenticating...</p>
+          <p className="text-muted-foreground animate-pulse font-medium">Loading session...</p>
         </div>
       </div>
     );
