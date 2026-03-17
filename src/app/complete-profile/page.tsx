@@ -94,7 +94,6 @@ export default function CompleteProfile() {
     }
   }, [user, profileComplete, loading, router, fullName, role]);
 
-  // Reset cascading selections when visitor type changes
   useEffect(() => {
     setSelectedCollege("");
     setSelectedProgram("");
@@ -104,7 +103,7 @@ export default function CompleteProfile() {
 
   const colleges = NEU_DATA[visitorType].map(item => item.college);
   const programs = selectedCollege 
-    ? NEU_DATA[visitorType].find(item => item.college === selectedCollege)?.programs || []
+    ? NEU_DATA[visitorType].find((item: any) => item.college === selectedCollege)?.programs || []
     : [];
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -113,26 +112,11 @@ export default function CompleteProfile() {
 
     if (!user || !db) return;
 
-    if (!fullName.trim()) {
-      setError("Full name is required.");
-      return;
-    }
-    if (!studentId.trim()) {
-      setError("Institutional ID is required.");
-      return;
-    }
-    if (!selectedCollege) {
-      setError("Please select your college.");
-      return;
-    }
-    if (!selectedProgram) {
-      setError("Please select your program/department.");
-      return;
-    }
-    if (visitorType !== "Faculty" && !yearLevel) {
-      setError("Year level is required.");
-      return;
-    }
+    if (!fullName.trim()) { setError("Full name is required."); return; }
+    if (!studentId.trim()) { setError("Institutional ID is required."); return; }
+    if (!selectedCollege) { setError("College selection is required."); return; }
+    if (!selectedProgram) { setError("Program/Department selection is required."); return; }
+    if (visitorType !== "Faculty" && !yearLevel) { setError("Year/Grade level selection is required."); return; }
 
     setIsSubmitting(true);
     try {
@@ -143,13 +127,12 @@ export default function CompleteProfile() {
         visitorType,
         college: selectedCollege,
         program: selectedProgram,
-        yearLevel: visitorType !== "Faculty" ? yearLevel : "N/A",
+        yearLevel: visitorType === "Faculty" ? "N/A" : yearLevel,
         profileComplete: true,
       });
       
       toast({ title: "Profile Saved", description: "Welcome to NEU Library!" });
       
-      // Navigate based on role (already checked in useEffect but double check here)
       if (role === "admin") {
         router.replace("/admin");
       } else {
@@ -172,7 +155,7 @@ export default function CompleteProfile() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-[#f5f8f5]">
-      <Card className="w-full max-w-lg shadow-2xl border-t-8 border-t-[#006600] rounded-xl overflow-hidden bg-white">
+      <Card className="w-full max-w-md shadow-2xl border-t-8 border-t-[#006600] rounded-xl overflow-hidden bg-white">
         <CardHeader className="space-y-4 pb-2">
           <div className="flex justify-center mb-2">
             <img src="/neu-seal.png" alt="NEU Seal" className="w-20 h-20 object-contain" />
@@ -184,6 +167,7 @@ export default function CompleteProfile() {
         </CardHeader>
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Visitor Type Selection */}
             <div className="space-y-3">
               <Label className="text-xs font-bold uppercase tracking-wider text-slate-600">Visitor Type <span className="text-red-500">*</span></Label>
               <div className="grid grid-cols-3 gap-2">
@@ -210,61 +194,64 @@ export default function CompleteProfile() {
               </div>
             </div>
 
+            {/* Basic Info */}
             <div className="space-y-2">
               <Label className="text-xs font-bold uppercase tracking-wider text-slate-600">Full Name <span className="text-red-500">*</span></Label>
               <Input 
                 placeholder="Enter your full name"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="h-12 border-slate-200 focus-visible:ring-[#006600] rounded-xl"
+                className="h-12 border-2 border-slate-100 focus:border-[#006600] focus:ring-0 rounded-xl"
               />
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                {visitorType === "Faculty" ? "Employee ID" : "Student ID"} <span className="text-red-500">*</span>
-              </Label>
+              <Label className="text-xs font-bold uppercase tracking-wider text-slate-600">Institutional ID <span className="text-red-500">*</span></Label>
               <Input 
                 placeholder="e.g. 24-12377-943"
                 value={studentId}
                 onChange={(e) => setStudentId(e.target.value)}
-                className="h-12 border-slate-200 focus-visible:ring-[#006600] rounded-xl"
+                className="h-12 border-2 border-slate-100 focus:border-[#006600] focus:ring-0 rounded-xl"
               />
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase tracking-wider text-slate-600">Select College/Department <span className="text-red-500">*</span></Label>
-              <select 
-                value={selectedCollege}
-                onChange={(e) => {
-                  setSelectedCollege(e.target.value);
-                  setSelectedProgram("");
-                }}
-                className="w-full h-12 rounded-xl border-2 border-slate-100 bg-white px-4 text-sm font-medium text-slate-700 outline-none focus:border-[#006600] transition-colors appearance-none"
-              >
-                <option value="">Select your college...</option>
-                {colleges.map(college => (
-                  <option key={college} value={college}>{college}</option>
-                ))}
-              </select>
-            </div>
-
-            {selectedCollege && (
-              <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                <Label className="text-xs font-bold uppercase tracking-wider text-slate-600">Select Program/Course <span className="text-red-500">*</span></Label>
-                <select
-                  value={selectedProgram}
-                  onChange={(e) => setSelectedProgram(e.target.value)}
-                  className="w-full h-12 rounded-xl border-2 border-slate-100 bg-white px-4 text-sm font-medium text-slate-700 outline-none focus:border-[#006600] transition-colors appearance-none"
+            {/* Cascading Dropdowns */}
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase tracking-wider text-slate-600">Select College/Department <span className="text-red-500">*</span></Label>
+                <select 
+                  value={selectedCollege}
+                  onChange={(e) => {
+                    setSelectedCollege(e.target.value);
+                    setSelectedProgram("");
+                  }}
+                  className="w-full h-12 border-2 border-slate-100 rounded-xl px-4 py-2 focus:border-[#006600] focus:outline-none bg-white text-sm font-medium"
                 >
-                  <option value="">Select your program...</option>
-                  {programs.map(program => (
-                    <option key={program} value={program}>{program}</option>
+                  <option value="">Select your college...</option>
+                  {colleges.map(college => (
+                    <option key={college} value={college}>{college}</option>
                   ))}
                 </select>
               </div>
-            )}
 
+              {selectedCollege && (
+                <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-slate-600">Select Program/Role <span className="text-red-500">*</span></Label>
+                  <select
+                    value={selectedProgram}
+                    onChange={(e) => setSelectedProgram(e.target.value)}
+                    className="w-full h-12 border-2 border-slate-100 rounded-xl px-4 py-2 focus:border-[#006600] focus:outline-none bg-white text-sm font-medium"
+                  >
+                    <option value="">Select your program...</option>
+                    {programs.map((program: string) => (
+                      <option key={program} value={program}>{program}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Year Level - Conditional */}
             {visitorType === "College Student" && (
               <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
                 <Label className="text-xs font-bold uppercase tracking-wider text-slate-600">Year Level <span className="text-red-500">*</span></Label>
@@ -311,6 +298,7 @@ export default function CompleteProfile() {
               </div>
             )}
 
+            {/* Error Message */}
             {error && (
               <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-xs font-bold animate-in shake duration-300">
                 <AlertCircle className="h-4 w-4" />
