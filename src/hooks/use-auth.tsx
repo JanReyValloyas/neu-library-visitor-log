@@ -8,7 +8,7 @@ import { doc, getDoc, setDoc, onSnapshot, serverTimestamp } from "firebase/fires
 import { useRouter, usePathname } from "next/navigation";
 import { toast } from "@/hooks/use-toast";
 
-interface UserProfile {
+export interface UserProfile {
   uid: string;
   email: string;
   displayName: string;
@@ -47,52 +47,67 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = async () => {
     if (!auth) return;
-    await signOut(auth);
-    setUser(null);
-    setProfile(null);
-    router.push("/");
+    try {
+      await signOut(auth);
+      setUser(null);
+      setProfile(null);
+      router.push("/");
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
   };
 
   useEffect(() => {
     if (!auth || !db) {
-      setLoading(false);
+      console.log("Auth or DB not initialized yet");
       return;
     }
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log("Auth state changed:", firebaseUser?.email || "No user");
+      
       if (firebaseUser) {
         setUser(firebaseUser);
-        const userDocRef = doc(db, "users", firebaseUser.uid);
-        const userDoc = await getDoc(userDocRef);
+        try {
+          const userDocRef = doc(db, "users", firebaseUser.uid);
+          const userDoc = await getDoc(userDocRef);
 
-        if (!userDoc.exists()) {
-          const newProfile: UserProfile = {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email || "",
-            displayName: firebaseUser.displayName || "",
-            photoURL: firebaseUser.photoURL || "",
-            role: "user",
-            isBlocked: false,
-            createdAt: serverTimestamp(),
-          };
-          await setDoc(userDocRef, newProfile);
-          setProfile(newProfile);
-        } else {
-          const data = userDoc.data() as UserProfile;
-          if (data.isBlocked) {
-            await signOut(auth);
-            toast({
-              title: "Access Denied",
-              description: "You are not allowed to use the library. Please contact the administrator.",
-              variant: "destructive",
-            });
-            setUser(null);
-            setProfile(null);
-            router.push("/");
-            setLoading(false);
-            return;
+          if (!userDoc.exists()) {
+            console.log("Creating new user profile...");
+            const newProfile: UserProfile = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email || "",
+              displayName: firebaseUser.displayName || "",
+              photoURL: firebaseUser.photoURL || "",
+              role: "user",
+              isBlocked: false,
+              createdAt: serverTimestamp(),
+            };
+            await setDoc(userDocRef, newProfile);
+            setProfile(newProfile);
+          } else {
+            const data = userDoc.data() as UserProfile;
+            console.log("Existing profile loaded. Role:", data.role);
+            
+            if (data.isBlocked) {
+              console.warn("User is blocked, signing out...");
+              await signOut(auth);
+              toast({
+                title: "Access Denied",
+                description: "Your account has been blocked. Please contact the administrator.",
+                variant: "destructive",
+              });
+              setUser(null);
+              setProfile(null);
+              router.push("/");
+              setLoading(false);
+              return;
+            }
+            setProfile(data);
           }
-          setProfile(data);
+        } catch (err) {
+          console.error("Error fetching/creating profile:", err);
+          toast({ title: "Auth Error", description: "Failed to load user profile.", variant: "destructive" });
         }
       } else {
         setUser(null);
@@ -104,6 +119,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => unsubscribeAuth();
   }, [auth, db, router]);
 
+  // Real-time profile updates (essential for role changes or blocks)
   useEffect(() => {
     if (user && db && auth) {
       const unsubscribeProfile = onSnapshot(doc(db, "users", user.uid), (doc) => {
@@ -115,11 +131,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           }
           setProfile(data);
         }
+      }, (error) => {
+        console.error("Profile snapshot error:", error);
       });
       return () => unsubscribeProfile();
     }
   }, [user, db, auth, router]);
 
+  // Route protection and redirection logic
   useEffect(() => {
     if (!loading) {
       const isAdminRoute = pathname.startsWith("/admin");
@@ -128,19 +147,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const isLoginRoute = pathname === "/";
 
       if (user && profile) {
+        // 1. Force profile completion
         if (!profile.program && !isProfileRoute && !isAdminRoute) {
+          console.log("Redirecting to complete-profile");
           router.push("/complete-profile");
           return;
         }
 
-        if (profile.role === "admin" && isDashboardRoute) {
-          router.push("/admin");
-        } else if (profile.role === "user" && isAdminRoute) {
-          router.push("/dashboard");
-        } else if (isLoginRoute) {
-          router.push(profile.role === "admin" ? "/admin" : "/dashboard");
+        // 2. Role-based redirection
+        if (profile.role === "admin") {
+          if (isDashboardRoute || isLoginRoute) {
+            console.log("Admin logged in, redirecting to /admin");
+            router.push("/admin");
+          }
+        } else {
+          // Regular user
+          if (isAdminRoute || isLoginRoute) {
+            console.log("User logged in, redirecting to /dashboard");
+            router.push("/dashboard");
+          }
         }
-      } else if (!isLoginRoute && !loading) {
+      } else if (!isLoginRoute) {
+        // Not logged in, and not on login page
+        console.log("Not logged in, redirecting to /");
         router.push("/");
       }
     }

@@ -26,13 +26,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatsCards } from "@/components/admin/stats-cards";
-import { ChartTooltipContent } from "@/components/ui/chart";
+import { ChartTooltipContent, ChartContainer } from "@/components/ui/chart";
 import { Bar, BarChart, XAxis, YAxis, ResponsiveContainer, CartesianGrid, Tooltip } from "recharts";
-import { Search, Download, Shield, ShieldAlert, UserCheck, UserMinus, Zap, Filter, Loader2 } from "lucide-react";
+import { Search, Download, Shield, ShieldAlert, UserCheck, UserMinus, Zap, Filter, Loader2, AlertCircle } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { format, startOfDay, startOfWeek, startOfMonth, subDays, isSameDay } from "date-fns";
 import { classifyVisitReason } from "@/ai/flows/classify-visit-reason";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface Visit {
   id: string;
@@ -72,6 +73,7 @@ export default function AdminDashboard() {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Filters
   const [reasonFilter, setReasonFilter] = useState("all");
@@ -83,32 +85,48 @@ export default function AdminDashboard() {
   const [quickSearch, setQuickSearch] = useState("");
   const [foundUser, setFoundUser] = useState<UserProfile | null>(null);
   const [quickReason, setQuickReason] = useState("");
+  const [isQuickLogging, setIsQuickLogging] = useState(false);
 
   useEffect(() => {
+    console.log("AdminDashboard Check - Profile:", profile?.email, "Role:", profile?.role);
+    
     if (!db || !profile || profile.role !== "admin") return;
 
-    const visitsUnsubscribe = onSnapshot(
-      query(collection(db, "visits"), orderBy("timestamp", "desc")),
-      (snapshot) => {
-        setVisits(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Visit)));
-        setLoadingData(false);
-      },
-      (error) => {
-        console.error("Error fetching visits:", error);
-        toast({ title: "Data Error", description: "Failed to load visitor logs.", variant: "destructive" });
-      }
-    );
+    setLoadingData(true);
+    setError(null);
 
-    const usersUnsubscribe = onSnapshot(
-      query(collection(db, "users"), orderBy("createdAt", "desc")),
-      (snapshot) => {
-        setUsers(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile)));
-      },
-      (error) => {
-        console.error("Error fetching users:", error);
-        toast({ title: "Data Error", description: "Failed to load user management data.", variant: "destructive" });
-      }
-    );
+    let visitsUnsubscribe = () => {};
+    let usersUnsubscribe = () => {};
+
+    try {
+      visitsUnsubscribe = onSnapshot(
+        query(collection(db, "visits"), orderBy("timestamp", "desc")),
+        (snapshot) => {
+          setVisits(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Visit)));
+          setLoadingData(false);
+        },
+        (error) => {
+          console.error("Error fetching visits:", error);
+          setError("Failed to load visitor logs. You may lack sufficient permissions.");
+          setLoadingData(false);
+        }
+      );
+
+      usersUnsubscribe = onSnapshot(
+        query(collection(db, "users"), orderBy("createdAt", "desc")),
+        (snapshot) => {
+          setUsers(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile)));
+        },
+        (error) => {
+          console.error("Error fetching users:", error);
+          toast({ title: "Data Error", description: "Failed to load user management data.", variant: "destructive" });
+        }
+      );
+    } catch (err) {
+      console.error("Critical dashboard error:", err);
+      setError("An unexpected error occurred while connecting to the database.");
+      setLoadingData(false);
+    }
 
     return () => {
       visitsUnsubscribe();
@@ -123,7 +141,12 @@ export default function AdminDashboard() {
     const week = startOfWeek(now);
     const month = startOfMonth(now);
 
-    const safeToDate = (ts: Timestamp | null) => ts ? ts.toDate() : null;
+    const safeToDate = (ts: any) => {
+      if (!ts) return null;
+      if (ts instanceof Timestamp) return ts.toDate();
+      if (ts.toDate && typeof ts.toDate === 'function') return ts.toDate();
+      return null;
+    };
 
     return {
       today: visits.filter(v => {
@@ -142,10 +165,16 @@ export default function AdminDashboard() {
     };
   }, [visits]);
 
-  // Chart Data Logic (Visitors per day last 7 days)
+  // Chart Data Logic
   const chartData = useMemo(() => {
-    const safeToDate = (ts: Timestamp | null) => ts ? ts.toDate() : null;
-    const days = Array.from({ length: 7 }, (_, i) => {
+    const safeToDate = (ts: any) => {
+      if (!ts) return null;
+      if (ts instanceof Timestamp) return ts.toDate();
+      if (ts.toDate && typeof ts.toDate === 'function') return ts.toDate();
+      return null;
+    };
+
+    return Array.from({ length: 7 }, (_, i) => {
       const d = subDays(new Date(), i);
       return {
         date: format(d, "MMM dd"),
@@ -155,19 +184,18 @@ export default function AdminDashboard() {
         }).length,
       };
     }).reverse();
-    return days;
   }, [visits]);
 
   // Filtering Logic
   const filteredVisits = useMemo(() => {
     return visits.filter(v => {
       const matchReason = reasonFilter === "all" || v.reason === reasonFilter;
-      const matchCollege = collegeFilter === "" || v.college?.toLowerCase().includes(collegeFilter.toLowerCase());
+      const matchCollege = collegeFilter === "" || (v.college || "").toLowerCase().includes(collegeFilter.toLowerCase());
       const matchEmployee = employeeFilter === "all" || (employeeFilter === "employee" ? v.isEmployee : !v.isEmployee);
       const matchSearch = searchTerm === "" || 
-        v.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        v.program?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        v.reason?.toLowerCase().includes(searchTerm.toLowerCase());
+        (v.displayName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (v.program || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (v.reason || "").toLowerCase().includes(searchTerm.toLowerCase());
       
       return matchReason && matchCollege && matchEmployee && matchSearch;
     });
@@ -179,7 +207,7 @@ export default function AdminDashboard() {
     try {
       const newRole = currentRole === "admin" ? "user" : "admin";
       await updateDoc(doc(db, "users", uid), { role: newRole });
-      toast({ title: "Role Updated", description: `User is now a ${newRole}.` });
+      toast({ title: "Role Updated", description: `User role changed to ${newRole}.` });
     } catch (error) {
       toast({ title: "Update Failed", description: "Failed to update user role.", variant: "destructive" });
     }
@@ -217,6 +245,7 @@ export default function AdminDashboard() {
 
   const handleQuickLogVisit = async () => {
     if (!db || !foundUser || !quickReason) return;
+    setIsQuickLogging(true);
     try {
       await addDoc(collection(db, "visits"), {
         uid: foundUser.uid,
@@ -236,18 +265,19 @@ export default function AdminDashboard() {
       setQuickReason("");
     } catch (e) {
       toast({ title: "Error", description: "Failed to log visit.", variant: "destructive" });
+    } finally {
+      setIsQuickLogging(false);
     }
   };
 
   const handleExportPDF = () => {
-    toast({ title: "Export Started", description: "Standard browser print dialog opened." });
     window.print();
   };
 
   const handleAIDiagnosis = async (visitId: string, currentReason: string) => {
     if (!db) return;
-    toast({ title: "AI Classifier", description: "Processing reason category..." });
     try {
+      toast({ title: "AI Classifier", description: "Processing reason category..." });
       const result = await classifyVisitReason({ reason: currentReason });
       await updateDoc(doc(db, "visits", visitId), { 
         aiClassified: result.classifiedCategory,
@@ -263,12 +293,27 @@ export default function AdminDashboard() {
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <p className="text-sm font-medium animate-pulse">Checking credentials...</p>
+        </div>
       </div>
     );
   }
 
-  if (!profile || profile.role !== "admin") return null;
+  if (!profile || profile.role !== "admin") {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Alert variant="destructive" className="max-w-md">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Access Denied</AlertTitle>
+          <AlertDescription>
+            You do not have administrative privileges to view this page. Redirecting...
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -277,23 +322,31 @@ export default function AdminDashboard() {
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold font-headline">Admin Dashboard</h1>
-            <p className="text-muted-foreground">Manage library visitors and user access control.</p>
+            <p className="text-muted-foreground">Manage library visitors and system users.</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={handleExportPDF}>
+            <Button variant="outline" onClick={handleExportPDF} className="hidden sm:flex">
               <Download className="mr-2 h-4 w-4" />
-              Export to PDF
+              Export PDF
             </Button>
           </div>
         </header>
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
         <StatsCards {...stats} />
 
         <Tabs defaultValue="visits" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3 md:w-auto h-12 p-1 bg-muted/50">
-            <TabsTrigger value="visits" className="data-[state=active]:bg-background">Visitor Logs</TabsTrigger>
-            <TabsTrigger value="users" className="data-[state=active]:bg-background">User Management</TabsTrigger>
-            <TabsTrigger value="quick-log" className="data-[state=active]:bg-background">Quick Log</TabsTrigger>
+            <TabsTrigger value="visits">Visitor Logs</TabsTrigger>
+            <TabsTrigger value="users">User Management</TabsTrigger>
+            <TabsTrigger value="quick-log">Quick Log</TabsTrigger>
           </TabsList>
 
           <TabsContent value="visits" className="space-y-6">
@@ -303,18 +356,16 @@ export default function AdminDashboard() {
                   <div className="flex flex-col md:flex-row md:items-center gap-4 justify-between">
                     <CardTitle className="flex items-center gap-2">
                       <Zap className="h-5 w-5 text-primary" />
-                      Visit History
+                      Visit Records
                     </CardTitle>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="relative w-full md:w-64">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input 
-                          placeholder="Search name, course, reason..." 
-                          className="pl-10"
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                      </div>
+                    <div className="relative w-full md:w-64">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        placeholder="Search records..." 
+                        className="pl-10"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-4">
@@ -330,18 +381,18 @@ export default function AdminDashboard() {
                       </SelectContent>
                     </Select>
                     <Input 
-                      placeholder="Filter by College..." 
+                      placeholder="College (e.g. CCS)" 
                       value={collegeFilter}
                       onChange={(e) => setCollegeFilter(e.target.value)}
                     />
                     <Select onValueChange={setEmployeeFilter} value={employeeFilter}>
                       <SelectTrigger>
-                        <SelectValue placeholder="All Visitors" />
+                        <SelectValue placeholder="Visitor Type" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Visitors</SelectItem>
-                        <SelectItem value="employee">Employees Only</SelectItem>
-                        <SelectItem value="student">Students Only</SelectItem>
+                        <SelectItem value="employee">Employees</SelectItem>
+                        <SelectItem value="student">Students</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -353,25 +404,22 @@ export default function AdminDashboard() {
                         <TableHead>Visitor</TableHead>
                         <TableHead>College/Program</TableHead>
                         <TableHead>Reason</TableHead>
-                        <TableHead>Date/Time</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        <TableHead>Timestamp</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {loadingData ? (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center py-12">
-                            <div className="flex justify-center items-center gap-2">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              Loading visits...
-                            </div>
+                          <TableCell colSpan={5} className="text-center py-12">
+                            <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                            <span>Fetching data...</span>
                           </TableCell>
                         </TableRow>
                       ) : filteredVisits.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
-                            No visitor records found.
+                          <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
+                            No records match your filters.
                           </TableCell>
                         </TableRow>
                       ) : (
@@ -379,21 +427,21 @@ export default function AdminDashboard() {
                           <TableRow key={visit.id}>
                             <TableCell>
                               <div className="flex flex-col">
-                                <span className="font-bold">{visit.displayName}</span>
+                                <span className="font-bold">{visit.displayName || "Anonymous"}</span>
                                 <span className="text-xs text-muted-foreground">{visit.email}</span>
                               </div>
                             </TableCell>
                             <TableCell>
-                              <div className="flex flex-col">
-                                <span className="text-sm font-medium">{visit.college}</span>
-                                <span className="text-xs text-muted-foreground">{visit.program}</span>
+                              <div className="flex flex-col text-sm">
+                                <span className="font-medium">{visit.college || "N/A"}</span>
+                                <span className="text-xs text-muted-foreground">{visit.program || "N/A"}</span>
                               </div>
                             </TableCell>
                             <TableCell>
                               <div className="flex flex-col gap-1">
                                 <Badge variant="outline" className="w-fit">{visit.reason}</Badge>
                                 {visit.aiClassified && (
-                                  <Badge variant="secondary" className="w-fit text-[10px] bg-green-100 text-green-800">
+                                  <Badge variant="secondary" className="w-fit text-[10px] bg-green-50 text-green-700 border-green-200">
                                     AI: {visit.aiClassified}
                                   </Badge>
                                 )}
@@ -401,18 +449,11 @@ export default function AdminDashboard() {
                             </TableCell>
                             <TableCell>
                               <div className="flex flex-col text-xs">
-                                <span>{visit.date}</span>
+                                <span className="font-medium">{visit.date}</span>
                                 <span className="text-muted-foreground">
-                                  {visit.timestamp ? format(visit.timestamp.toDate(), "hh:mm a") : "..."}
+                                  {visit.timestamp ? format(visit.timestamp.toDate(), "hh:mm a") : "---"}
                                 </span>
                               </div>
-                            </TableCell>
-                            <TableCell>
-                              {visit.isEmployee ? (
-                                <Badge className="bg-blue-100 text-blue-800 border-none">{visit.employeeType}</Badge>
-                              ) : (
-                                <Badge variant="secondary" className="border-none">Student</Badge>
-                              )}
                             </TableCell>
                             <TableCell className="text-right">
                               {visit.reason === "Other" && !visit.aiClassified && (
@@ -421,9 +462,8 @@ export default function AdminDashboard() {
                                   variant="ghost" 
                                   onClick={() => handleAIDiagnosis(visit.id, visit.reason)}
                                   className="h-8 w-8 p-0"
-                                  title="AI Classify"
                                 >
-                                  <Zap className="h-4 w-4 text-accent" />
+                                  <Zap className="h-4 w-4 text-primary" />
                                 </Button>
                               )}
                             </TableCell>
@@ -437,16 +477,24 @@ export default function AdminDashboard() {
 
               <Card className="border-none shadow-md h-fit">
                 <CardHeader>
-                  <CardTitle className="text-lg">Weekly Overview</CardTitle>
-                  <CardDescription>Visitors per day (Last 7 days)</CardDescription>
+                  <CardTitle className="text-lg">Activity Trend</CardTitle>
+                  <CardDescription>Visitors (Last 7 days)</CardDescription>
                 </CardHeader>
-                <CardContent className="h-[250px]">
+                <CardContent className="h-[250px] p-0 pb-4">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
-                      <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 10}} />
+                    <BarChart data={chartData} margin={{ top: 0, right: 20, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                      <XAxis 
+                        dataKey="date" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{fontSize: 10, fill: '#888'}} 
+                      />
                       <YAxis hide />
-                      <Tooltip content={<ChartTooltipContent hideIndicator />} />
+                      <Tooltip 
+                        cursor={{fill: '#f5f5f5'}}
+                        content={<ChartTooltipContent hideIndicator />} 
+                      />
                       <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -458,14 +506,14 @@ export default function AdminDashboard() {
           <TabsContent value="users">
             <Card className="border-none shadow-md">
               <CardHeader>
-                <CardTitle>Registered Users</CardTitle>
-                <CardDescription>Manage user roles and access status.</CardDescription>
+                <CardTitle>System Users</CardTitle>
+                <CardDescription>Update user permissions and status.</CardDescription>
               </CardHeader>
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/30">
-                      <TableHead>User Information</TableHead>
+                      <TableHead>User</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>College/Program</TableHead>
                       <TableHead>Status</TableHead>
@@ -473,55 +521,63 @@ export default function AdminDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users.map((u) => (
-                      <TableRow key={u.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <img src={u.photoURL} className="w-8 h-8 rounded-full" referrerPolicy="no-referrer" alt={u.displayName} />
-                            <div className="flex flex-col">
-                              <span className="font-bold">{u.displayName}</span>
-                              <span className="text-xs text-muted-foreground">{u.email}</span>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={u.role === "admin" ? "default" : "secondary"}>
-                            {u.role.toUpperCase()}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-xs">
-                            <p className="font-medium">{u.college || "N/A"}</p>
-                            <p className="text-muted-foreground">{u.program || "Profile incomplete"}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {u.isBlocked ? (
-                            <Badge variant="destructive">Blocked</Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">Active</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right space-x-2">
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            onClick={() => handleToggleRole(u.id, u.role)}
-                          >
-                            {u.role === "admin" ? <UserMinus className="h-4 w-4 mr-1" /> : <Shield className="h-4 w-4 mr-1" />}
-                            {u.role === "admin" ? "Demote" : "Promote"}
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant={u.isBlocked ? "default" : "destructive"} 
-                            onClick={() => handleToggleBlock(u.id, u.isBlocked)}
-                          >
-                            {u.isBlocked ? <UserCheck className="h-4 w-4 mr-1" /> : <ShieldAlert className="h-4 w-4 mr-1" />}
-                            {u.isBlocked ? "Unblock" : "Block"}
-                          </Button>
+                    {users.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
+                          No users registered yet.
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : (
+                      users.map((u) => (
+                        <TableRow key={u.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <img src={u.photoURL || `https://picsum.photos/seed/${u.id}/32/32`} className="w-8 h-8 rounded-full bg-muted" alt={u.displayName} />
+                              <div className="flex flex-col">
+                                <span className="font-bold">{u.displayName || "Unknown"}</span>
+                                <span className="text-xs text-muted-foreground">{u.email}</span>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={u.role === "admin" ? "default" : "secondary"}>
+                              {u.role.toUpperCase()}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-xs">
+                              <p className="font-medium">{u.college || "N/A"}</p>
+                              <p className="text-muted-foreground">{u.program || "No program info"}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {u.isBlocked ? (
+                              <Badge variant="destructive">Blocked</Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">Active</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right space-x-2">
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={() => handleToggleRole(u.id, u.role)}
+                            >
+                              {u.role === "admin" ? <UserMinus className="h-4 w-4 mr-1" /> : <Shield className="h-4 w-4 mr-1" />}
+                              {u.role === "admin" ? "Demote" : "Promote"}
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant={u.isBlocked ? "default" : "destructive"} 
+                              onClick={() => handleToggleBlock(u.id, u.isBlocked)}
+                            >
+                              {u.isBlocked ? <UserCheck className="h-4 w-4 mr-1" /> : <ShieldAlert className="h-4 w-4 mr-1" />}
+                              {u.isBlocked ? "Unblock" : "Block"}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </div>
@@ -532,8 +588,8 @@ export default function AdminDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <Card className="border-none shadow-md">
                 <CardHeader>
-                  <CardTitle>Quick Log Visitor</CardTitle>
-                  <CardDescription>Log a visit manually by searching for an email address.</CardDescription>
+                  <CardTitle>Manual Visit Log</CardTitle>
+                  <CardDescription>Lookup a user by email to log their visit manually.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="flex gap-2">
@@ -557,13 +613,13 @@ export default function AdminDashboard() {
                         <div>
                           <h3 className="text-xl font-bold">{foundUser.displayName}</h3>
                           <p className="text-sm text-muted-foreground">{foundUser.email}</p>
-                          <Badge variant="outline" className="mt-1">{foundUser.college} • {foundUser.program}</Badge>
+                          <Badge variant="outline" className="mt-1">{foundUser.college || "No College"} • {foundUser.program || "No Program"}</Badge>
                         </div>
                       </div>
                       
                       <div className="space-y-4">
                         <div className="space-y-2">
-                          <Label>Select Visit Reason</Label>
+                          <Label>Visit Reason</Label>
                           <Select onValueChange={setQuickReason} value={quickReason}>
                             <SelectTrigger>
                               <SelectValue placeholder="Select reason" />
@@ -575,8 +631,13 @@ export default function AdminDashboard() {
                             </SelectContent>
                           </Select>
                         </div>
-                        <Button className="w-full h-12" onClick={handleQuickLogVisit}>
-                          Log Visit for {foundUser.displayName.split(' ')[0]}
+                        <Button 
+                          className="w-full h-12" 
+                          onClick={handleQuickLogVisit}
+                          disabled={!quickReason || isQuickLogging}
+                        >
+                          {isQuickLogging ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                          Log Visit
                         </Button>
                       </div>
                     </div>
@@ -585,31 +646,30 @@ export default function AdminDashboard() {
               </Card>
 
               <div className="space-y-6">
-                <Card className="bg-primary text-primary-foreground border-none shadow-xl overflow-hidden relative">
+                <Card className="bg-primary text-primary-foreground border-none shadow-xl relative overflow-hidden">
                   <div className="absolute top-0 right-0 p-8 opacity-10">
                     <Zap className="h-32 w-32" />
                   </div>
                   <CardHeader>
-                    <CardTitle className="text-2xl font-headline">Admin Guide</CardTitle>
+                    <CardTitle className="text-2xl font-headline">Admin Control</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4 relative z-10">
-                    <div className="flex items-start gap-3">
-                      <div className="bg-white/20 p-2 rounded-lg">
-                        <Filter className="h-5 w-5" />
+                    <p className="text-sm text-primary-foreground/80">
+                      As an administrator, you can manage user access, verify records, and use AI classification to improve your data insights.
+                    </p>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Shield className="h-4 w-4" />
+                        <span>Manage Roles & Permissions</span>
                       </div>
-                      <p className="text-sm">Use the filters to narrow down specific data ranges or visitor types for detailed reporting.</p>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <div className="bg-white/20 p-2 rounded-lg">
-                        <Download className="h-5 w-5" />
+                      <div className="flex items-center gap-2 text-sm">
+                        <ShieldAlert className="h-4 w-4" />
+                        <span>Revoke Access (Block Users)</span>
                       </div>
-                      <p className="text-sm">Export filtered results to PDF for easy sharing and physical record-keeping.</p>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <div className="bg-white/20 p-2 rounded-lg">
-                        <Zap className="h-5 w-5" />
+                      <div className="flex items-center gap-2 text-sm">
+                        <Zap className="h-4 w-4" />
+                        <span>AI-Assisted Classification</span>
                       </div>
-                      <p className="text-sm">AI Classification helps categorize "Other" reasons automatically for cleaner analytics.</p>
                     </div>
                   </CardContent>
                 </Card>
