@@ -29,18 +29,21 @@ const reasons = [
 ];
 
 export default function Dashboard() {
-  const { user, profileComplete, loading } = useAuth();
+  const { user, profile, profileComplete, loading } = useAuth();
   const router = useRouter();
   const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
   const [otherReason, setOtherReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
       router.replace("/");
     }
-  }, [user, loading, router]);
+    if (!loading && user && profileComplete === false) {
+      router.replace("/complete-profile");
+    }
+  }, [user, profileComplete, loading, router]);
 
   const handleToggleReason = (reason: string) => {
     setSelectedReasons(prev => 
@@ -48,7 +51,7 @@ export default function Dashboard() {
     );
   };
 
-  const handleCheckIn = async () => {
+  const handleConfirmCheckIn = async () => {
     if (!user || !db) return;
     if (selectedReasons.length === 0) {
       toast({ title: "Selection Required", description: "Please select at least one reason.", variant: "destructive" });
@@ -58,31 +61,37 @@ export default function Dashboard() {
     setIsSubmitting(true);
     try {
       const finalReasons = selectedReasons.map(r => r === "Other" ? `Other: ${otherReason}` : r).join(", ");
+      
       await addDoc(collection(db, "visits"), {
         uid: user.uid,
         displayName: user.displayName,
         email: user.email,
+        program: profile?.program || "N/A",
+        college: profile?.college || "N/A",
+        visitorType: profile?.visitorType || "College Student",
+        isEmployee: profile?.visitorType === "Faculty",
+        employeeType: profile?.visitorType === "Faculty" ? profile?.program : "",
         reason: finalReasons,
         timestamp: serverTimestamp(),
         date: format(new Date(), "yyyy-MM-dd"),
+        studentId: profile?.studentId || "N/A",
       });
 
-      setIsSuccess(true);
+      setShowSuccess(true);
       
-      // Wait for 2 seconds, then sign out and redirect
       setTimeout(async () => {
         await signOut(auth);
         router.replace("/");
       }, 2000);
 
     } catch (error: any) {
-      console.error(error);
+      console.error("Check-in error:", error);
       toast({ title: "Error", description: "Could not log your visit.", variant: "destructive" });
       setIsSubmitting(false);
     }
   };
 
-  if (loading || (!user && !isSuccess)) {
+  if (loading || (!user && !showSuccess)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f5f8f5]">
         <div className="flex flex-col items-center gap-4">
@@ -93,26 +102,22 @@ export default function Dashboard() {
     );
   }
 
-  if (isSuccess) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f5f8f5] p-6 text-center animate-in fade-in zoom-in duration-500">
-        <div className="space-y-6">
-          <div className="flex justify-center">
-            <div className="h-24 w-24 bg-[#006600] rounded-full flex items-center justify-center shadow-2xl">
-              <PartyPopper className="h-12 w-12 text-white" />
-            </div>
-          </div>
-          <h1 className="text-3xl font-bold text-[#006600]">Visit Logged Successfully!</h1>
-          <p className="text-slate-600 font-medium">Thank you for visiting NEU Library. Your entry has been recorded.</p>
-          <div className="w-12 h-1 bg-[#D4AF37] mx-auto rounded-full animate-pulse" />
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest pt-12">Resetting session for next visitor...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col min-h-screen pb-32 animate-in fade-in duration-500">
+      {showSuccess && (
+        <div className="fixed inset-0 bg-[#006600] flex flex-col items-center justify-center z-[100] text-white animate-in zoom-in duration-300">
+          <div className="text-8xl mb-6">✅</div>
+          <h2 className="text-3xl font-bold mb-2">Visit Logged!</h2>
+          <p className="text-green-100 text-lg">Thank you, {user?.displayName}!</p>
+          <div className="mt-8 flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin text-[#D4AF37]" />
+            <p className="text-[#D4AF37] text-xs font-bold uppercase tracking-widest">
+              Signing out for next visitor...
+            </p>
+          </div>
+        </div>
+      )}
+
       <header className="p-4 flex items-center justify-between bg-white border-b sticky top-0 z-10 shadow-sm">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => router.push('/')} className="h-9 w-9 text-slate-600">
@@ -120,7 +125,7 @@ export default function Dashboard() {
           </Button>
           <div>
             <h1 className="font-bold text-base leading-tight text-slate-800">Welcome, {user.displayName?.split(' ')[0]}!</h1>
-            <p className="text-[10px] font-bold text-[#006600] tracking-wider uppercase">LIBRARY PORTAL</p>
+            <p className="text-[10px] font-bold text-[#006600] tracking-wider uppercase">LIBRARY PORTAL • {profile?.program?.toUpperCase() || 'USER'}</p>
           </div>
         </div>
         <Avatar className="h-10 w-10 border-2 border-[#D4AF37] shadow-sm">
@@ -186,7 +191,7 @@ export default function Dashboard() {
       <footer className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[28rem] p-4 bg-white/80 backdrop-blur-md z-50">
         <div className="w-full">
           <Button 
-            onClick={handleCheckIn}
+            onClick={handleConfirmCheckIn}
             disabled={isSubmitting || selectedReasons.length === 0}
             className="w-full h-14 bg-[#006600] hover:bg-[#004d00] text-white font-bold text-base rounded-xl shadow-2xl flex items-center justify-center gap-2 group uppercase tracking-widest transition-all active:scale-95"
           >

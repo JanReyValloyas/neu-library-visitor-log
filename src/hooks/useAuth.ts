@@ -8,6 +8,7 @@ import { auth, db } from "@/firebase/index";
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<string | null>(null);
+  const [profile, setProfile] = useState<any | null>(null);
   const [profileComplete, setProfileComplete] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -24,10 +25,12 @@ export function useAuth() {
               await auth.signOut();
               setUser(null);
               setRole(null);
+              setProfile(null);
               setProfileComplete(null);
               setLoading(false);
               return;
             }
+            setProfile(data);
             setRole(data.role ?? "user");
             setProfileComplete(data.profileComplete === true);
           } else {
@@ -42,6 +45,7 @@ export function useAuth() {
               createdAt: serverTimestamp(),
             };
             await setDoc(userRef, newProfile);
+            setProfile(newProfile);
             setRole("user");
             setProfileComplete(false);
           }
@@ -53,6 +57,7 @@ export function useAuth() {
       } else {
         setUser(null);
         setRole(null);
+        setProfile(null);
         setProfileComplete(null);
       }
       setLoading(false);
@@ -60,5 +65,5 @@ export function useAuth() {
     return () => unsubscribe();
   }, []);
 
-  return { user, role, profileComplete, loading };
+  return { user, role, profile, profileComplete, loading };
 }
