@@ -5,7 +5,19 @@ import { useEffect, useState, useMemo } from "react";
 import { Navbar } from "@/components/navbar";
 import { useAuth } from "@/hooks/use-auth";
 import { useFirestore } from "@/firebase";
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
+import { 
+  collection, 
+  query, 
+  orderBy, 
+  onSnapshot, 
+  doc, 
+  updateDoc, 
+  where, 
+  getDocs, 
+  addDoc, 
+  serverTimestamp,
+  Timestamp 
+} from "firebase/firestore";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -16,18 +28,50 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { StatsCards } from "@/components/admin/stats-cards";
 import { ChartTooltipContent } from "@/components/ui/chart";
 import { Bar, BarChart, XAxis, YAxis, ResponsiveContainer, CartesianGrid, Tooltip } from "recharts";
-import { Search, Download, Shield, ShieldAlert, UserCheck, UserMinus, Zap, Filter } from "lucide-react";
+import { Search, Download, Shield, ShieldAlert, UserCheck, UserMinus, Zap, Filter, Loader2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { format, startOfDay, startOfWeek, startOfMonth, subDays, isSameDay } from "date-fns";
 import { classifyVisitReason } from "@/ai/flows/classify-visit-reason";
 
+interface Visit {
+  id: string;
+  uid: string;
+  displayName: string;
+  email: string;
+  program: string;
+  college: string;
+  isEmployee: boolean;
+  employeeType: string;
+  reason: string;
+  timestamp: Timestamp | null;
+  date: string;
+  aiClassified?: string;
+  aiSuggestion?: string;
+  aiExplanation?: string;
+}
+
+interface UserProfile {
+  id: string;
+  uid: string;
+  email: string;
+  displayName: string;
+  photoURL: string;
+  role: "user" | "admin";
+  isBlocked: boolean;
+  program?: string;
+  college?: string;
+  isEmployee?: boolean;
+  employeeType?: string;
+  createdAt: Timestamp | null;
+}
+
 export default function AdminDashboard() {
-  const { profile } = useAuth();
+  const { profile, loading: authLoading } = useAuth();
   const db = useFirestore();
-  const [visits, setVisits] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [visits, setVisits] = useState<Visit[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
 
   // Filters
   const [reasonFilter, setReasonFilter] = useState("all");
@@ -37,24 +81,32 @@ export default function AdminDashboard() {
 
   // Quick Log
   const [quickSearch, setQuickSearch] = useState("");
-  const [foundUser, setFoundUser] = useState<any>(null);
+  const [foundUser, setFoundUser] = useState<UserProfile | null>(null);
   const [quickReason, setQuickReason] = useState("");
 
   useEffect(() => {
-    if (!db) return;
+    if (!db || !profile || profile.role !== "admin") return;
 
     const visitsUnsubscribe = onSnapshot(
       query(collection(db, "visits"), orderBy("timestamp", "desc")),
       (snapshot) => {
-        setVisits(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-        setLoading(false);
+        setVisits(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Visit)));
+        setLoadingData(false);
+      },
+      (error) => {
+        console.error("Error fetching visits:", error);
+        toast({ title: "Data Error", description: "Failed to load visitor logs.", variant: "destructive" });
       }
     );
 
     const usersUnsubscribe = onSnapshot(
       query(collection(db, "users"), orderBy("createdAt", "desc")),
       (snapshot) => {
-        setUsers(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+        setUsers(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile)));
+      },
+      (error) => {
+        console.error("Error fetching users:", error);
+        toast({ title: "Data Error", description: "Failed to load user management data.", variant: "destructive" });
       }
     );
 
@@ -62,7 +114,7 @@ export default function AdminDashboard() {
       visitsUnsubscribe();
       usersUnsubscribe();
     };
-  }, [db]);
+  }, [db, profile]);
 
   // Stats Logic
   const stats = useMemo(() => {
@@ -71,21 +123,36 @@ export default function AdminDashboard() {
     const week = startOfWeek(now);
     const month = startOfMonth(now);
 
+    const safeToDate = (ts: Timestamp | null) => ts ? ts.toDate() : null;
+
     return {
-      today: visits.filter(v => v.timestamp && isSameDay(v.timestamp.toDate(), today)).length,
-      week: visits.filter(v => v.timestamp && v.timestamp.toDate() >= week).length,
-      month: visits.filter(v => v.timestamp && v.timestamp.toDate() >= month).length,
+      today: visits.filter(v => {
+        const d = safeToDate(v.timestamp);
+        return d && isSameDay(d, today);
+      }).length,
+      week: visits.filter(v => {
+        const d = safeToDate(v.timestamp);
+        return d && d >= week;
+      }).length,
+      month: visits.filter(v => {
+        const d = safeToDate(v.timestamp);
+        return d && d >= month;
+      }).length,
       allTime: visits.length
     };
   }, [visits]);
 
   // Chart Data Logic (Visitors per day last 7 days)
   const chartData = useMemo(() => {
+    const safeToDate = (ts: Timestamp | null) => ts ? ts.toDate() : null;
     const days = Array.from({ length: 7 }, (_, i) => {
       const d = subDays(new Date(), i);
       return {
         date: format(d, "MMM dd"),
-        count: visits.filter(v => v.timestamp && isSameDay(v.timestamp.toDate(), d)).length,
+        count: visits.filter(v => {
+          const vd = safeToDate(v.timestamp);
+          return vd && isSameDay(vd, d);
+        }).length,
       };
     }).reverse();
     return days;
@@ -109,30 +176,42 @@ export default function AdminDashboard() {
   // Handlers
   const handleToggleRole = async (uid: string, currentRole: string) => {
     if (!db) return;
-    const newRole = currentRole === "admin" ? "user" : "admin";
-    await updateDoc(doc(db, "users", uid), { role: newRole });
-    toast({ title: "Role Updated", description: `User is now a ${newRole}.` });
+    try {
+      const newRole = currentRole === "admin" ? "user" : "admin";
+      await updateDoc(doc(db, "users", uid), { role: newRole });
+      toast({ title: "Role Updated", description: `User is now a ${newRole}.` });
+    } catch (error) {
+      toast({ title: "Update Failed", description: "Failed to update user role.", variant: "destructive" });
+    }
   };
 
   const handleToggleBlock = async (uid: string, currentStatus: boolean) => {
     if (!db) return;
-    await updateDoc(doc(db, "users", uid), { isBlocked: !currentStatus });
-    toast({ 
-      title: currentStatus ? "User Unblocked" : "User Blocked", 
-      description: `User access has been ${currentStatus ? "restored" : "revoked"}.`,
-      variant: currentStatus ? "default" : "destructive" 
-    });
+    try {
+      await updateDoc(doc(db, "users", uid), { isBlocked: !currentStatus });
+      toast({ 
+        title: currentStatus ? "User Unblocked" : "User Blocked", 
+        description: `User access has been ${currentStatus ? "restored" : "revoked"}.`,
+        variant: currentStatus ? "default" : "destructive" 
+      });
+    } catch (error) {
+      toast({ title: "Action Failed", description: "Failed to change block status.", variant: "destructive" });
+    }
   };
 
   const handleQuickLookup = async () => {
     if (!db || !quickSearch) return;
-    const q = query(collection(db, "users"), where("email", "==", quickSearch));
-    const snap = await getDocs(q);
-    if (!snap.empty) {
-      setFoundUser({ id: snap.docs[0].id, ...snap.docs[0].data() });
-    } else {
-      setFoundUser(null);
-      toast({ title: "Not Found", description: "No user found with this email.", variant: "destructive" });
+    try {
+      const q = query(collection(db, "users"), where("email", "==", quickSearch.trim()));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        setFoundUser({ id: snap.docs[0].id, ...snap.docs[0].data() } as UserProfile);
+      } else {
+        setFoundUser(null);
+        toast({ title: "Not Found", description: "No user found with this email.", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Lookup Error", description: "Search failed. Please try again.", variant: "destructive" });
     }
   };
 
@@ -180,6 +259,14 @@ export default function AdminDashboard() {
       toast({ title: "AI Error", description: "Failed to process with AI.", variant: "destructive" });
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (!profile || profile.role !== "admin") return null;
 
@@ -272,9 +359,14 @@ export default function AdminDashboard() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {loading ? (
+                      {loadingData ? (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center py-12">Loading visits...</TableCell>
+                          <TableCell colSpan={6} className="text-center py-12">
+                            <div className="flex justify-center items-center gap-2">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Loading visits...
+                            </div>
+                          </TableCell>
                         </TableRow>
                       ) : filteredVisits.length === 0 ? (
                         <TableRow>
@@ -369,68 +461,70 @@ export default function AdminDashboard() {
                 <CardTitle>Registered Users</CardTitle>
                 <CardDescription>Manage user roles and access status.</CardDescription>
               </CardHeader>
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/30">
-                    <TableHead>User Information</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>College/Program</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.map((u) => (
-                    <TableRow key={u.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <img src={u.photoURL} className="w-8 h-8 rounded-full" referrerPolicy="no-referrer" />
-                          <div className="flex flex-col">
-                            <span className="font-bold">{u.displayName}</span>
-                            <span className="text-xs text-muted-foreground">{u.email}</span>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={u.role === "admin" ? "default" : "secondary"}>
-                          {u.role.toUpperCase()}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-xs">
-                          <p className="font-medium">{u.college || "N/A"}</p>
-                          <p className="text-muted-foreground">{u.program || "Profile incomplete"}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {u.isBlocked ? (
-                          <Badge variant="destructive">Blocked</Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">Active</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          onClick={() => handleToggleRole(u.id, u.role)}
-                        >
-                          {u.role === "admin" ? <UserMinus className="h-4 w-4 mr-1" /> : <Shield className="h-4 w-4 mr-1" />}
-                          {u.role === "admin" ? "Demote" : "Promote"}
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant={u.isBlocked ? "default" : "destructive"} 
-                          onClick={() => handleToggleBlock(u.id, u.isBlocked)}
-                        >
-                          {u.isBlocked ? <UserCheck className="h-4 w-4 mr-1" /> : <ShieldAlert className="h-4 w-4 mr-1" />}
-                          {u.isBlocked ? "Unblock" : "Block"}
-                        </Button>
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/30">
+                      <TableHead>User Information</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>College/Program</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map((u) => (
+                      <TableRow key={u.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <img src={u.photoURL} className="w-8 h-8 rounded-full" referrerPolicy="no-referrer" alt={u.displayName} />
+                            <div className="flex flex-col">
+                              <span className="font-bold">{u.displayName}</span>
+                              <span className="text-xs text-muted-foreground">{u.email}</span>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={u.role === "admin" ? "default" : "secondary"}>
+                            {u.role.toUpperCase()}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-xs">
+                            <p className="font-medium">{u.college || "N/A"}</p>
+                            <p className="text-muted-foreground">{u.program || "Profile incomplete"}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {u.isBlocked ? (
+                            <Badge variant="destructive">Blocked</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">Active</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right space-x-2">
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => handleToggleRole(u.id, u.role)}
+                          >
+                            {u.role === "admin" ? <UserMinus className="h-4 w-4 mr-1" /> : <Shield className="h-4 w-4 mr-1" />}
+                            {u.role === "admin" ? "Demote" : "Promote"}
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant={u.isBlocked ? "default" : "destructive"} 
+                            onClick={() => handleToggleBlock(u.id, u.isBlocked)}
+                          >
+                            {u.isBlocked ? <UserCheck className="h-4 w-4 mr-1" /> : <ShieldAlert className="h-4 w-4 mr-1" />}
+                            {u.isBlocked ? "Unblock" : "Block"}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </Card>
           </TabsContent>
 
@@ -459,7 +553,7 @@ export default function AdminDashboard() {
                   {foundUser && (
                     <div className="p-6 border rounded-xl bg-muted/20 animate-in zoom-in-95 duration-200">
                       <div className="flex items-center gap-4 mb-6">
-                        <img src={foundUser.photoURL} className="w-16 h-16 rounded-full ring-2 ring-primary ring-offset-2" referrerPolicy="no-referrer" />
+                        <img src={foundUser.photoURL} className="w-16 h-16 rounded-full ring-2 ring-primary ring-offset-2" referrerPolicy="no-referrer" alt={foundUser.displayName} />
                         <div>
                           <h3 className="text-xl font-bold">{foundUser.displayName}</h3>
                           <p className="text-sm text-muted-foreground">{foundUser.email}</p>
