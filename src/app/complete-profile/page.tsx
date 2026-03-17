@@ -10,101 +10,156 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, GraduationCap, School, Briefcase } from "lucide-react";
+import { Loader2, GraduationCap, School, Briefcase, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const COLLEGE_PROGRAMS = [
-  "Accountancy", "Accounting Information System",
-  "Agriculture", "Economics", "Political Science", 
-  "Biology", "Psychology", "Public Administration",
-  "Financial Management", "Human Resource Development Management",
-  "Legal Management", "Marketing Management", 
-  "Entrepreneurship", "Real Estate Management",
-  "Communication", "Computing Studies", "Criminology",
-  "Secondary Education", "Elementary Education", "Teacher Education",
-  "Civil Engineering", "Electronics Engineering", 
-  "Electrical Engineering", "Industrial Engineering",
-  "Mechanical Engineering", "Architecture", "BS Astronomy",
-  "Law", "Medical Technology", "Medicine", "Midwifery",
-  "Music", "Nursing", "Physical Therapy", 
-  "Respiratory Therapy", "International Relations",
-  "Graduate Studies"
-];
+const NEU_DATA = {
+  "College Student": [
+    { college: "College of Accountancy", programs: ["Accountancy", "Accounting Information System"] },
+    { college: "College of Agriculture", programs: ["Agriculture"] },
+    { college: "College of Arts and Sciences", programs: ["Economics", "Political Science", "Biology", "Psychology", "Public Administration"] },
+    { college: "College of Business Administration", programs: ["Financial Management", "Human Resource Development Management", "Legal Management", "Marketing Management", "Entrepreneurship", "Real Estate Management"] },
+    { college: "College of Communication", programs: ["Communication"] },
+    { college: "College of Informatics and Computing Studies", programs: ["Computing Studies"] },
+    { college: "College of Criminology", programs: ["Criminology"] },
+    { college: "College of Education", programs: ["Secondary Education", "Elementary Education", "Teacher Education"] },
+    { college: "College of Engineering and Architecture", programs: ["Civil Engineering", "Electronics Engineering", "Electrical Engineering", "Industrial Engineering", "Mechanical Engineering", "Architecture", "BS Astronomy"] },
+    { college: "College of Law", programs: ["Law"] },
+    { college: "College of Medical Technology", programs: ["Medical Technology"] },
+    { college: "College of Medicine", programs: ["Medicine"] },
+    { college: "College of Midwifery", programs: ["Midwifery"] },
+    { college: "College of Music", programs: ["Music"] },
+    { college: "College of Nursing", programs: ["Nursing"] },
+    { college: "College of Physical Therapy", programs: ["Physical Therapy"] },
+    { college: "College of Respiratory Therapy", programs: ["Respiratory Therapy"] },
+    { college: "School of International Relations", programs: ["International Relations"] },
+    { college: "School of Graduate Studies", programs: ["Graduate Studies"] },
+    { college: "NEUVLE +5", programs: ["NEUVLE"] },
+  ],
+  "IS Student": [
+    { college: "Integrated School - Academic Track", programs: ["GAS", "STEM", "ABM", "HUMSS"] },
+    { college: "Integrated School - TVL Track", programs: ["ICT", "Home Economics"] },
+    { college: "Integrated School - Arts and Design Track", programs: ["Media/Visual Arts", "Literary/Theater Arts", "Music"] },
+  ],
+  "Faculty": [
+    { college: "College of Accountancy", programs: ["Teacher", "Staff"] },
+    { college: "College of Agriculture", programs: ["Teacher", "Staff"] },
+    { college: "College of Arts and Sciences", programs: ["Teacher", "Staff"] },
+    { college: "College of Business Administration", programs: ["Teacher", "Staff"] },
+    { college: "College of Communication", programs: ["Teacher", "Staff"] },
+    { college: "College of Informatics and Computing Studies", programs: ["Teacher", "Staff"] },
+    { college: "College of Criminology", programs: ["Teacher", "Staff"] },
+    { college: "College of Education", programs: ["Teacher", "Staff"] },
+    { college: "College of Engineering and Architecture", programs: ["Teacher", "Staff"] },
+    { college: "College of Law", programs: ["Teacher", "Staff"] },
+    { college: "College of Medical Technology", programs: ["Teacher", "Staff"] },
+    { college: "College of Medicine", programs: ["Teacher", "Staff"] },
+    { college: "College of Midwifery", programs: ["Teacher", "Staff"] },
+    { college: "College of Music", programs: ["Teacher", "Staff"] },
+    { college: "College of Nursing", programs: ["Teacher", "Staff"] },
+    { college: "College of Physical Therapy", programs: ["Teacher", "Staff"] },
+    { college: "College of Respiratory Therapy", programs: ["Teacher", "Staff"] },
+    { college: "School of International Relations", programs: ["Teacher", "Staff"] },
+    { college: "School of Graduate Studies", programs: ["Teacher", "Staff"] },
+    { college: "Library", programs: ["Librarian", "Library Staff"] },
+    { college: "Administration", programs: ["Administrator", "Staff"] },
+  ]
+} as const;
 
-const IS_PROGRAMS = [
-  "GAS", "STEM", "ABM", "HUMSS",
-  "ICT", "Home Economics",
-  "Media/Visual Arts", "Literary/Theater Arts", "Music"
-];
-
-const FACULTY_TYPES = [
-  "Teacher", "Staff", "Administrator", "Librarian"
-];
-
-type VisitorType = "College Student" | "IS Student" | "Faculty";
+type VisitorType = keyof typeof NEU_DATA;
 
 export default function CompleteProfile() {
-  const { user, profileComplete, loading } = useAuth();
+  const { user, role, profileComplete, loading } = useAuth();
   const router = useRouter();
   
+  const [visitorType, setVisitorType] = useState<VisitorType>("College Student");
   const [fullName, setFullName] = useState("");
   const [studentId, setStudentId] = useState("");
-  const [visitorType, setVisitorType] = useState<VisitorType>("College Student");
-  const [program, setProgram] = useState("");
+  const [selectedCollege, setSelectedCollege] = useState("");
+  const [selectedProgram, setSelectedProgram] = useState("");
   const [yearLevel, setYearLevel] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!loading && !user) {
       router.replace("/");
     }
     if (!loading && user && profileComplete === true) {
-      router.replace("/dashboard");
+      if (role === "admin") router.replace("/admin");
+      else router.replace("/dashboard");
     }
     if (user && !fullName) {
       setFullName(user.displayName || "");
     }
-  }, [user, profileComplete, loading, router, fullName]);
+  }, [user, profileComplete, loading, router, fullName, role]);
+
+  // Reset cascading selections when visitor type changes
+  useEffect(() => {
+    setSelectedCollege("");
+    setSelectedProgram("");
+    setYearLevel("");
+    setError("");
+  }, [visitorType]);
+
+  const colleges = NEU_DATA[visitorType].map(item => item.college);
+  const programs = selectedCollege 
+    ? NEU_DATA[visitorType].find(item => item.college === selectedCollege)?.programs || []
+    : [];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
+
     if (!user || !db) return;
 
-    if (!fullName || !studentId || !program) {
-      toast({ title: "Validation Error", description: "Please fill in all required fields.", variant: "destructive" });
+    if (!fullName.trim()) {
+      setError("Full name is required.");
       return;
     }
-
+    if (!studentId.trim()) {
+      setError("Institutional ID is required.");
+      return;
+    }
+    if (!selectedCollege) {
+      setError("Please select your college.");
+      return;
+    }
+    if (!selectedProgram) {
+      setError("Please select your program/department.");
+      return;
+    }
     if (visitorType !== "Faculty" && !yearLevel) {
-      toast({ title: "Validation Error", description: "Please select your year/grade level.", variant: "destructive" });
+      setError("Year level is required.");
       return;
     }
 
     setIsSubmitting(true);
     try {
-      await updateDoc(doc(db, "users", user.uid), {
+      const userRef = doc(db, "users", user.uid);
+      await updateDoc(userRef, {
         displayName: fullName.trim(),
         studentId: studentId.trim(),
         visitorType,
-        program,
+        college: selectedCollege,
+        program: selectedProgram,
         yearLevel: visitorType !== "Faculty" ? yearLevel : "N/A",
         profileComplete: true,
       });
       
       toast({ title: "Profile Saved", description: "Welcome to NEU Library!" });
-      router.replace("/dashboard");
-    } catch (error: any) {
-      console.error(error);
+      
+      // Navigate based on role (already checked in useEffect but double check here)
+      if (role === "admin") {
+        router.replace("/admin");
+      } else {
+        router.replace("/dashboard");
+      }
+    } catch (err: any) {
+      console.error(err);
       toast({ title: "Error", description: "Failed to update profile.", variant: "destructive" });
-    } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const getPrograms = () => {
-    if (visitorType === "College Student") return COLLEGE_PROGRAMS;
-    if (visitorType === "IS Student") return IS_PROGRAMS;
-    return FACULTY_TYPES;
   };
 
   if (loading) {
@@ -140,11 +195,7 @@ export default function CompleteProfile() {
                   <button
                     key={type.id}
                     type="button"
-                    onClick={() => {
-                      setVisitorType(type.id as VisitorType);
-                      setProgram("");
-                      setYearLevel("");
-                    }}
+                    onClick={() => setVisitorType(type.id as VisitorType)}
                     className={cn(
                       "flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all gap-1",
                       visitorType === type.id 
@@ -160,48 +211,59 @@ export default function CompleteProfile() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="fullName" className="text-xs font-bold uppercase tracking-wider text-slate-600">Full Name <span className="text-red-500">*</span></Label>
+              <Label className="text-xs font-bold uppercase tracking-wider text-slate-600">Full Name <span className="text-red-500">*</span></Label>
               <Input 
-                id="fullName"
-                placeholder="Juan Dela Cruz"
+                placeholder="Enter your full name"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 className="h-12 border-slate-200 focus-visible:ring-[#006600] rounded-xl"
-                required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="studentId" className="text-xs font-bold uppercase tracking-wider text-slate-600">
+              <Label className="text-xs font-bold uppercase tracking-wider text-slate-600">
                 {visitorType === "Faculty" ? "Employee ID" : "Student ID"} <span className="text-red-500">*</span>
               </Label>
               <Input 
-                id="studentId"
                 placeholder="e.g. 24-12377-943"
                 value={studentId}
                 onChange={(e) => setStudentId(e.target.value)}
                 className="h-12 border-slate-200 focus-visible:ring-[#006600] rounded-xl"
-                required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="program" className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                {visitorType === "Faculty" ? "Position / Role" : "Academic Program"} <span className="text-red-500">*</span>
-              </Label>
+              <Label className="text-xs font-bold uppercase tracking-wider text-slate-600">Select College/Department <span className="text-red-500">*</span></Label>
               <select 
-                id="program"
-                value={program}
-                onChange={(e) => setProgram(e.target.value)}
+                value={selectedCollege}
+                onChange={(e) => {
+                  setSelectedCollege(e.target.value);
+                  setSelectedProgram("");
+                }}
                 className="w-full h-12 rounded-xl border-2 border-slate-100 bg-white px-4 text-sm font-medium text-slate-700 outline-none focus:border-[#006600] transition-colors appearance-none"
-                required
               >
-                <option value="">Select your {visitorType === "Faculty" ? "role" : "program"}</option>
-                {getPrograms().map((p) => (
-                  <option key={p} value={p}>{p}</option>
+                <option value="">Select your college...</option>
+                {colleges.map(college => (
+                  <option key={college} value={college}>{college}</option>
                 ))}
               </select>
             </div>
+
+            {selectedCollege && (
+              <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                <Label className="text-xs font-bold uppercase tracking-wider text-slate-600">Select Program/Course <span className="text-red-500">*</span></Label>
+                <select
+                  value={selectedProgram}
+                  onChange={(e) => setSelectedProgram(e.target.value)}
+                  className="w-full h-12 rounded-xl border-2 border-slate-100 bg-white px-4 text-sm font-medium text-slate-700 outline-none focus:border-[#006600] transition-colors appearance-none"
+                >
+                  <option value="">Select your program...</option>
+                  {programs.map(program => (
+                    <option key={program} value={program}>{program}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {visitorType === "College Student" && (
               <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
@@ -246,6 +308,13 @@ export default function CompleteProfile() {
                     </button>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {error && (
+              <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-xs font-bold animate-in shake duration-300">
+                <AlertCircle className="h-4 w-4" />
+                {error}
               </div>
             )}
 
