@@ -155,7 +155,7 @@ export default function Home() {
         <div className="bg-[#006600] p-8 flex flex-col items-center space-y-4">
           <div className="bg-white p-3 rounded-2xl shadow-lg">
             <Image 
-              src="https://upload.wikimedia.org/wikipedia/en/thumb/4/4d/New_Era_University_seal.svg/150px-New_Era_University_seal.svg.png"
+              src="/neu-seal.png"
               alt="NEU Seal"
               width={80}
               height={80}
