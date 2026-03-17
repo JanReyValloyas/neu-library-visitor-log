@@ -1,18 +1,43 @@
 
 "use client";
 
+import { useEffect, useState } from "react";
 import { useAuthInstance } from "@/firebase";
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { GoogleAuthProvider, signInWithRedirect, getRedirectResult } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BookOpen, LogIn } from "lucide-react";
+import { BookOpen, LogIn, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
 
 export default function Home() {
-  const { loading } = useAuth();
+  const { loading: authLoading } = useAuth();
   const auth = useAuthInstance();
+  const [redirecting, setRedirecting] = useState(false);
+
+  useEffect(() => {
+    if (!auth) return;
+
+    const checkRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+          console.log("Successfully signed in via redirect");
+        }
+      } catch (error: any) {
+        console.error("Error handling redirect result:", error);
+        // Common error codes like 'auth/popup-closed-by-user' don't apply to redirect
+        // but we'll show a generic error for others.
+        toast({
+          title: "Sign-in Error",
+          description: error.message || "An error occurred while completing the sign-in process.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    checkRedirectResult();
+  }, [auth]);
 
   const handleLogin = async () => {
     if (!auth) {
@@ -30,23 +55,27 @@ export default function Home() {
     });
 
     try {
-      await signInWithPopup(auth, googleProvider);
+      setRedirecting(true);
+      await signInWithRedirect(auth, googleProvider);
     } catch (error: any) {
-      console.error("Login failed:", error);
+      setRedirecting(false);
+      console.error("Login redirect failed:", error);
       toast({
         title: "Login Failed",
-        description: error.message || "An error occurred during sign in.",
+        description: error.message || "An error occurred while initiating sign in.",
         variant: "destructive",
       });
     }
   };
 
-  if (loading) {
+  if (authLoading || redirecting) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <Skeleton className="h-16 w-16 rounded-full" />
-          <Skeleton className="h-4 w-48" />
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="text-muted-foreground animate-pulse font-medium">
+            {redirecting ? "Redirecting to Google..." : "Authenticating..."}
+          </p>
         </div>
       </div>
     );
@@ -72,6 +101,7 @@ export default function Home() {
             className="w-full h-12 text-lg font-medium transition-all hover:scale-[1.02]" 
             size="lg"
             onClick={handleLogin}
+            disabled={redirecting}
           >
             <LogIn className="mr-2 h-5 w-5" />
             Sign in with Google
