@@ -9,7 +9,7 @@ import { Loader2, UserCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 export default function LoginPage() {
-  const { user, role, loading } = useAuth();
+  const { user, role, profileComplete, loading } = useAuth();
   const router = useRouter();
   const [signingIn, setSigningIn] = useState(false);
   const [idLoading, setIdLoading] = useState(false);
@@ -17,14 +17,16 @@ export default function LoginPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!loading && user && role) {
-      if (role === "admin") {
+    if (!loading && user) {
+      if (profileComplete === false) {
+        router.replace("/complete-profile");
+      } else if (role === "admin") {
         router.replace("/admin");
       } else {
         router.replace("/dashboard");
       }
     }
-  }, [user, role, loading, router]);
+  }, [user, role, profileComplete, loading, router]);
 
   const handleIdLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,15 +63,17 @@ export default function LoginPage() {
         return;
       }
 
-      // Success: Store user data in sessionStorage for quick check-in
+      // Success: Store FULL profile from Firestore to link with their existing account
       sessionStorage.setItem("quickVisitUser", JSON.stringify({
         uid: userData.uid,
+        email: userData.email,
         displayName: userData.displayName,
         program: userData.program,
         college: userData.college || "N/A",
         visitorType: userData.visitorType,
         yearLevel: userData.yearLevel || "N/A",
         studentId: userData.studentId,
+        photoURL: userData.photoURL,
       }));
 
       router.push("/checkin");
@@ -94,7 +98,7 @@ export default function LoginPage() {
     }
   };
 
-  if (loading || (user && role)) {
+  if (loading || (user && profileComplete !== null)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f5f8f5]">
         <div className="flex flex-col items-center gap-4">
@@ -112,8 +116,8 @@ export default function LoginPage() {
           <div className="bg-white rounded-xl p-3">
             <img src="/neu-seal.png" alt="NEU Seal" className="w-20 h-20 object-contain" />
           </div>
-          <h1 className="text-white text-2xl font-bold">NEU Library</h1>
-          <div className="w-16 h-1 bg-[#FFD700] rounded"></div>
+          <h1 className="text-white text-2xl font-bold uppercase tracking-tight">NEU Library</h1>
+          <div className="w-16 h-1 bg-[#D4AF37] rounded"></div>
         </div>
         <div className="p-6 space-y-6">
           <div>
@@ -122,7 +126,7 @@ export default function LoginPage() {
           </div>
           <form onSubmit={handleIdLogin} className="space-y-4">
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-[#006600] uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-[#006600] uppercase tracking-widest">
                 Institutional ID Access
               </label>
               <div className="relative">
@@ -132,13 +136,13 @@ export default function LoginPage() {
                   placeholder="RFID or Student ID Number"
                   value={studentIdInput}
                   onChange={(e) => setStudentIdInput(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-[#006600] focus:ring-1 focus:ring-[#006600]"
+                  className="w-full border-2 border-slate-100 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-[#006600] transition-colors"
                 />
               </div>
               <button 
                 type="submit"
                 disabled={idLoading}
-                className="w-full bg-[#006600] text-white py-3 rounded-lg font-bold uppercase tracking-wider hover:bg-green-800 transition flex items-center justify-center gap-2"
+                className="w-full bg-[#006600] text-white py-4 rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-green-800 transition shadow-lg flex items-center justify-center gap-2"
               >
                 {idLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Log Visit →"}
               </button>
@@ -146,17 +150,21 @@ export default function LoginPage() {
           </form>
 
           <div className="relative flex items-center">
-            <div className="flex-grow border-t border-gray-200"></div>
-            <span className="mx-4 text-xs text-gray-400 uppercase">or</span>
-            <div className="flex-grow border-t border-gray-200"></div>
+            <div className="flex-grow border-t border-gray-100"></div>
+            <span className="mx-4 text-[10px] font-bold text-gray-300 uppercase tracking-widest">or</span>
+            <div className="flex-grow border-t border-gray-100"></div>
           </div>
 
-          {error && <p className="text-red-500 text-xs text-center font-bold px-4">{error}</p>}
+          {error && (
+            <div className="bg-red-50 border border-red-100 p-3 rounded-xl animate-in shake duration-300">
+              <p className="text-red-600 text-[10px] text-center font-bold uppercase tracking-wide">{error}</p>
+            </div>
+          )}
           
           <button
             onClick={handleGoogleSignIn}
             disabled={signingIn}
-            className="w-full border-2 border-gray-100 rounded-lg py-3 flex items-center justify-center gap-3 hover:border-[#006600]/30 transition font-medium text-slate-700"
+            className="w-full border-2 border-slate-100 rounded-xl py-3.5 flex items-center justify-center gap-3 hover:border-[#006600]/30 hover:bg-slate-50 transition font-bold text-slate-600 text-xs uppercase tracking-wide"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -168,11 +176,11 @@ export default function LoginPage() {
           </button>
           
           <p className="text-[10px] text-center text-gray-400 uppercase tracking-widest">
-            Access restricted to <span className="text-[#006600] font-bold">@neu.edu.ph</span> accounts only
+            Restricted to <span className="text-[#006600] font-bold">@neu.edu.ph</span> accounts
           </p>
         </div>
-        <div className="bg-[#f5f8f5] p-4 text-center border-t">
-          <p className="text-xs text-gray-400 uppercase tracking-widest font-bold">🛡️ Secure Academic Portal © 2024 NEU</p>
+        <div className="bg-[#f5f8f5] p-5 text-center border-t border-slate-100">
+          <p className="text-[10px] text-slate-400 uppercase tracking-[0.2em] font-bold">🛡️ Secure Academic Portal © 2024 NEU</p>
         </div>
       </div>
     </div>

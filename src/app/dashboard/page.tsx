@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -61,17 +60,20 @@ export default function Dashboard() {
     try {
       const finalReasons = selectedReasons.map(r => r === "Other" ? `Other: ${otherReason}` : r).join(", ");
       
+      // Save visit with full profile details consistent with Quick Entry schema
       await addDoc(collection(db, "visits"), {
         uid: user.uid,
-        displayName: user.displayName,
         email: user.email,
+        displayName: user.displayName,
         program: profile?.program || "N/A",
+        college: profile?.college || "N/A",
         visitorType: profile?.visitorType || "College Student",
         isEmployee: profile?.visitorType === "Faculty",
         reason: finalReasons,
         timestamp: serverTimestamp(),
         date: new Date().toISOString().split("T")[0],
         studentId: profile?.studentId || "N/A",
+        yearLevel: profile?.yearLevel || "N/A",
       });
 
       setShowSuccess(true);
@@ -106,8 +108,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen pb-32 animate-in fade-in duration-500">
-      {/* Success Overlay */}
+    <div className="flex flex-col min-h-screen pb-32 animate-in fade-in duration-500 bg-[#f5f8f5]">
       {showSuccess && (
         <div className="fixed inset-0 bg-[#006600] flex flex-col items-center justify-center z-[100] text-white animate-in zoom-in duration-300">
           <div className="text-8xl mb-6">✅</div>

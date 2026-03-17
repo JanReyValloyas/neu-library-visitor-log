@@ -57,10 +57,11 @@ export default function QuickCheckIn() {
     try {
       const finalReasons = selectedReasons.map(r => r === "Other" ? `Other: ${otherReason}` : r).join(", ");
       
+      // Save visit linked to their Google UID for unified reporting
       await addDoc(collection(db, "visits"), {
         uid: userData.uid,
+        email: userData.email,
         displayName: userData.displayName,
-        email: userData.email || "N/A",
         program: userData.program || "N/A",
         college: userData.college || "N/A",
         visitorType: userData.visitorType || "College Student",
