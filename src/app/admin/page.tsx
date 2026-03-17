@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -26,7 +25,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatsCards } from "@/components/admin/stats-cards";
-import { ChartTooltipContent, ChartContainer } from "@/components/ui/chart";
 import { Bar, BarChart, XAxis, YAxis, ResponsiveContainer, CartesianGrid, Tooltip } from "recharts";
 import { Search, Download, Shield, ShieldAlert, UserCheck, UserMinus, Zap, Loader2, AlertCircle } from "lucide-react";
 import { Label } from "@/components/ui/label";
@@ -445,14 +443,14 @@ export default function AdminDashboard() {
                   <CardTitle className="text-base font-semibold">Weekly Trajectory</CardTitle>
                   <CardDescription>Visualizing visitor counts</CardDescription>
                 </CardHeader>
-                <CardContent className="h-[200px] p-0 pb-4">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} margin={{ top: 0, right: 10, left: 10, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
-                      <XAxis dataKey="date" hide />
-                      <YAxis hide />
-                      <Tooltip content={<ChartTooltipContent hideIndicator />} />
-                      <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                <CardContent className="h-[300px] p-4">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="count" fill="#1a237e" />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
