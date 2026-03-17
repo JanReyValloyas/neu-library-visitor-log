@@ -1,9 +1,8 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { db, auth } from "@/firebase/index";
+import { db } from "@/firebase/index";
 import { doc, updateDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,12 +41,10 @@ const FACULTY_TYPES = [
   "Teacher", "Staff", "Administrator", "Librarian"
 ];
 
-const YEAR_LEVELS = ["1st", "2nd", "3rd", "4th"];
-
 type VisitorType = "College Student" | "IS Student" | "Faculty";
 
 export default function CompleteProfile() {
-  const { user, role, profileComplete, loading } = useAuth();
+  const { user, profileComplete, loading } = useAuth();
   const router = useRouter();
   
   const [fullName, setFullName] = useState("");
@@ -79,7 +76,7 @@ export default function CompleteProfile() {
     }
 
     if (visitorType !== "Faculty" && !yearLevel) {
-      toast({ title: "Validation Error", description: "Please select your year level.", variant: "destructive" });
+      toast({ title: "Validation Error", description: "Please select your year/grade level.", variant: "destructive" });
       return;
     }
 
@@ -90,7 +87,7 @@ export default function CompleteProfile() {
         studentId: studentId.trim(),
         visitorType,
         program,
-        yearLevel: visitorType !== "Faculty" ? yearLevel : "",
+        yearLevel: visitorType !== "Faculty" ? yearLevel : "N/A",
         profileComplete: true,
       });
       
@@ -120,8 +117,8 @@ export default function CompleteProfile() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-[#f5f8f5]">
-      <Card className="w-full max-w-lg shadow-2xl border-t-8 border-t-[#006600] rounded-xl overflow-hidden">
-        <CardHeader className="bg-white/50 space-y-4 pb-2">
+      <Card className="w-full max-w-lg shadow-2xl border-t-8 border-t-[#006600] rounded-xl overflow-hidden bg-white">
+        <CardHeader className="space-y-4 pb-2">
           <div className="flex justify-center mb-2">
             <img src="/neu-seal.png" alt="NEU Seal" className="w-20 h-20 object-contain" />
           </div>
@@ -146,6 +143,7 @@ export default function CompleteProfile() {
                     onClick={() => {
                       setVisitorType(type.id as VisitorType);
                       setProgram("");
+                      setYearLevel("");
                     }}
                     className={cn(
                       "flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all gap-1",
@@ -205,23 +203,46 @@ export default function CompleteProfile() {
               </select>
             </div>
 
-            {visitorType !== "Faculty" && (
+            {visitorType === "College Student" && (
               <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
                 <Label className="text-xs font-bold uppercase tracking-wider text-slate-600">Year Level <span className="text-red-500">*</span></Label>
-                <div className="grid grid-cols-4 gap-2">
-                  {YEAR_LEVELS.map((level) => (
+                <div className="flex gap-2 flex-wrap">
+                  {["1st", "2nd", "3rd", "4th", "Irregular"].map((year) => (
                     <button
-                      key={level}
+                      key={year}
                       type="button"
-                      onClick={() => setYearLevel(level)}
+                      onClick={() => setYearLevel(year)}
                       className={cn(
-                        "h-10 rounded-xl border-2 font-bold text-xs transition-all",
-                        yearLevel === level 
+                        "px-4 py-2 rounded-xl border-2 font-bold text-xs transition-all",
+                        yearLevel === year 
                           ? "bg-[#006600] border-[#006600] text-white shadow-md" 
                           : "bg-white border-slate-100 text-slate-500 hover:border-slate-200"
                       )}
                     >
-                      {level}
+                      {year}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {visitorType === "IS Student" && (
+              <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                <Label className="text-xs font-bold uppercase tracking-wider text-slate-600">Grade Level <span className="text-red-500">*</span></Label>
+                <div className="flex gap-2">
+                  {["Grade 11", "Grade 12"].map((grade) => (
+                    <button
+                      key={grade}
+                      type="button"
+                      onClick={() => setYearLevel(grade)}
+                      className={cn(
+                        "px-4 py-2 rounded-xl border-2 font-bold text-xs transition-all",
+                        yearLevel === grade 
+                          ? "bg-[#006600] border-[#006600] text-white shadow-md" 
+                          : "bg-white border-slate-100 text-slate-500 hover:border-slate-200"
+                      )}
+                    >
+                      {grade}
                     </button>
                   ))}
                 </div>
