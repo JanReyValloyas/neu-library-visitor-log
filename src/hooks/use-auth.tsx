@@ -46,6 +46,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
 
   const logout = async () => {
+    if (!auth) return;
     await signOut(auth);
     setUser(null);
     setProfile(null);
@@ -53,6 +54,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
+    if (!auth || !db) {
+      setLoading(false);
+      return;
+    }
+
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
@@ -99,7 +105,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [auth, db, router]);
 
   useEffect(() => {
-    if (user) {
+    if (user && db && auth) {
       const unsubscribeProfile = onSnapshot(doc(db, "users", user.uid), (doc) => {
         if (doc.exists()) {
           const data = doc.data() as UserProfile;
