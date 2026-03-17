@@ -1,33 +1,39 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useFirestore } from "@/firebase";
 import { doc, updateDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
-
-const colleges = [
-  "CCS", "CBA", "COE", "COED", "CAHS", "CAS", "CRIM", "CITHM"
-];
+import { COLLEGES } from "@/lib/colleges";
 
 export default function CompleteProfile() {
   const { profile, loading } = useAuth();
   const db = useFirestore();
   const router = useRouter();
   
-  const [program, setProgram] = useState("");
   const [college, setCollege] = useState("");
+  const [program, setProgram] = useState("");
   const [isEmployee, setIsEmployee] = useState(false);
   const [employeeType, setEmployeeType] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const departments = useMemo(() => {
+    const selected = COLLEGES.find(c => c.college === college);
+    return selected ? selected.departments : [];
+  }, [college]);
+
+  const handleCollegeChange = (val: string) => {
+    setCollege(val);
+    setProgram(""); // Reset program when college changes
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,42 +64,45 @@ export default function CompleteProfile() {
   if (loading) return null;
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
-      <Card className="w-full max-w-lg border-t-8 border-t-accent">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-[#f5f8f5] font-['Lexend']">
+      <Card className="w-full max-w-lg shadow-2xl border-t-8 border-t-[#006600]">
         <CardHeader>
-          <CardTitle className="text-2xl font-headline">Complete Your Profile</CardTitle>
+          <CardTitle className="text-2xl font-bold text-[#006600]">Complete Your Profile</CardTitle>
           <CardDescription>We need a few more details before you can log your first visit.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="program">Program / Course</Label>
-              <Input 
-                id="program" 
-                placeholder="e.g. BS Computer Science" 
-                value={program}
-                onChange={(e) => setProgram(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
               <Label htmlFor="college">College</Label>
-              <Select onValueChange={setCollege} value={college}>
+              <Select onValueChange={handleCollegeChange} value={college}>
                 <SelectTrigger id="college">
                   <SelectValue placeholder="Select your college" />
                 </SelectTrigger>
                 <SelectContent>
-                  {colleges.map((c) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  {COLLEGES.map((c) => (
+                    <SelectItem key={c.college} value={c.college}>{c.college}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="flex items-center justify-between space-x-2 py-2 border rounded-lg px-4 bg-muted/30">
-              <Label htmlFor="is-employee" className="flex flex-col gap-1">
-                <span>Are you an employee?</span>
+            <div className="space-y-2">
+              <Label htmlFor="program">Department / Program</Label>
+              <Select onValueChange={setProgram} value={program} disabled={!college}>
+                <SelectTrigger id="program">
+                  <SelectValue placeholder={college ? "Select your program" : "Select college first"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments.map((dept) => (
+                    <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center justify-between space-x-2 py-2 border rounded-lg px-4 bg-white">
+              <Label htmlFor="is-employee" className="flex flex-col gap-1 cursor-pointer">
+                <span className="font-semibold">Are you an employee?</span>
                 <span className="font-normal text-xs text-muted-foreground">Toggle if you are faculty or staff</span>
               </Label>
               <Switch 
@@ -120,7 +129,7 @@ export default function CompleteProfile() {
 
             <Button 
               type="submit" 
-              className="w-full bg-primary hover:bg-primary/90" 
+              className="w-full bg-[#006600] hover:bg-[#004d00] text-white font-bold h-12 rounded-xl transition-all shadow-md" 
               disabled={isSubmitting}
             >
               {isSubmitting ? "Saving..." : "Start Logging Visits"}

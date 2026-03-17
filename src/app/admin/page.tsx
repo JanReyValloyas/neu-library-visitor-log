@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -32,6 +33,7 @@ import { toast } from "@/hooks/use-toast";
 import { format, startOfDay, startOfWeek, startOfMonth, subDays, isSameDay } from "date-fns";
 import { classifyVisitReason } from "@/ai/flows/classify-visit-reason";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { COLLEGES } from "@/lib/colleges";
 
 interface Visit {
   id: string;
@@ -75,7 +77,7 @@ export default function AdminDashboard() {
 
   // Filters
   const [reasonFilter, setReasonFilter] = useState("all");
-  const [collegeFilter, setCollegeFilter] = useState("");
+  const [collegeFilter, setCollegeFilter] = useState("all");
   const [employeeFilter, setEmployeeFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -88,9 +90,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (!db || authLoading) return;
     
-    // Safety check: ensure user is admin
     if (!profile || profile.role !== "admin") {
-      console.log("Not an admin or still loading profile...");
       return;
     }
 
@@ -176,7 +176,7 @@ export default function AdminDashboard() {
     const safeVisits = Array.isArray(visits) ? visits : [];
     return safeVisits.filter(v => {
       const matchReason = reasonFilter === "all" || v.reason === reasonFilter;
-      const matchCollege = !collegeFilter || (v.college || "").toLowerCase().includes(collegeFilter.toLowerCase());
+      const matchCollege = collegeFilter === "all" || v.college === collegeFilter;
       const matchEmployee = employeeFilter === "all" || (employeeFilter === "employee" ? v.isEmployee : !v.isEmployee);
       const matchSearch = !searchTerm || 
         (v.displayName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -289,15 +289,15 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#f5f8f5] font-['Lexend']">
       <Navbar />
       <main className="container mx-auto px-4 py-8 space-y-8 max-w-7xl">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold font-headline tracking-tight">Admin Control Panel</h1>
+            <h1 className="text-3xl font-bold font-headline tracking-tight text-[#006600]">Admin Control Panel</h1>
             <p className="text-muted-foreground">Monitoring NEU Library visitor flow and user governance.</p>
           </div>
-          <Button variant="outline" onClick={() => window.print()} className="hidden sm:flex">
+          <Button variant="outline" onClick={() => window.print()} className="hidden sm:flex border-[#006600] text-[#006600] hover:bg-[#006600] hover:text-white">
             <Download className="mr-2 h-4 w-4" />
             Print Report
           </Button>
@@ -314,26 +314,26 @@ export default function AdminDashboard() {
         <StatsCards {...stats} />
 
         <Tabs defaultValue="visits" className="space-y-6">
-          <TabsList className="bg-muted/50 p-1 border">
-            <TabsTrigger value="visits">Visitor Logs</TabsTrigger>
-            <TabsTrigger value="users">User Management</TabsTrigger>
-            <TabsTrigger value="quick-log">Direct Entry</TabsTrigger>
+          <TabsList className="bg-white/50 p-1 border border-[#006600]/20">
+            <TabsTrigger value="visits" className="data-[state=active]:bg-[#006600] data-[state=active]:text-white">Visitor Logs</TabsTrigger>
+            <TabsTrigger value="users" className="data-[state=active]:bg-[#006600] data-[state=active]:text-white">User Management</TabsTrigger>
+            <TabsTrigger value="quick-log" className="data-[state=active]:bg-[#006600] data-[state=active]:text-white">Direct Entry</TabsTrigger>
           </TabsList>
 
           <TabsContent value="visits" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              <Card className="lg:col-span-3 border-none shadow-md overflow-hidden">
+              <Card className="lg:col-span-3 border-none shadow-md overflow-hidden bg-white">
                 <CardHeader className="bg-muted/30 border-b">
                   <div className="flex flex-col md:flex-row md:items-center gap-4 justify-between">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Zap className="h-5 w-5 text-primary" />
+                    <CardTitle className="text-lg flex items-center gap-2 text-[#006600]">
+                      <Zap className="h-5 w-5" />
                       Activity Stream
                     </CardTitle>
                     <div className="relative w-full md:w-64">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input 
                         placeholder="Search visitor or email..." 
-                        className="pl-10 h-9"
+                        className="pl-10 h-9 bg-white"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                       />
@@ -341,7 +341,7 @@ export default function AdminDashboard() {
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-4">
                     <Select onValueChange={setReasonFilter} value={reasonFilter}>
-                      <SelectTrigger className="h-9">
+                      <SelectTrigger className="h-9 bg-white">
                         <SelectValue placeholder="All Reasons" />
                       </SelectTrigger>
                       <SelectContent>
@@ -351,14 +351,21 @@ export default function AdminDashboard() {
                         ))}
                       </SelectContent>
                     </Select>
-                    <Input 
-                      placeholder="College (e.g. CCS)" 
-                      className="h-9"
-                      value={collegeFilter}
-                      onChange={(e) => setCollegeFilter(e.target.value)}
-                    />
+                    
+                    <Select onValueChange={setCollegeFilter} value={collegeFilter}>
+                      <SelectTrigger className="h-9 bg-white">
+                        <SelectValue placeholder="All Colleges" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Colleges</SelectItem>
+                        {COLLEGES.map((c) => (
+                          <SelectItem key={c.college} value={c.college}>{c.college}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
                     <Select onValueChange={setEmployeeFilter} value={employeeFilter}>
-                      <SelectTrigger className="h-9">
+                      <SelectTrigger className="h-9 bg-white">
                         <SelectValue placeholder="Visitor Type" />
                       </SelectTrigger>
                       <SelectContent>
@@ -397,13 +404,13 @@ export default function AdminDashboard() {
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-col text-xs">
-                              <span className="font-medium text-primary">{visit.college || "N/A"}</span>
+                              <span className="font-medium text-[#006600]">{visit.college || "N/A"}</span>
                               <span className="text-muted-foreground truncate max-w-[150px]">{visit.program || "N/A"}</span>
                             </div>
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-col gap-1">
-                              <Badge variant="outline" className="w-fit text-[10px]">{visit.reason}</Badge>
+                              <Badge variant="outline" className="w-fit text-[10px] border-[#006600]/30">{visit.reason}</Badge>
                               {visit.aiClassified && (
                                 <Badge variant="secondary" className="w-fit text-[9px] bg-green-50 text-green-700 border-green-200">
                                   AI: {visit.aiClassified}
@@ -425,9 +432,9 @@ export default function AdminDashboard() {
                                 size="sm" 
                                 variant="ghost" 
                                 onClick={() => handleAIDiagnosis(visit.id, visit.reason)}
-                                className="h-7 w-7 p-0"
+                                className="h-7 w-7 p-0 hover:bg-[#006600]/10"
                               >
-                                <Zap className="h-3.5 w-3.5 text-primary" />
+                                <Zap className="h-3.5 w-3.5 text-[#006600]" />
                               </Button>
                             )}
                           </TableCell>
@@ -438,9 +445,9 @@ export default function AdminDashboard() {
                 </Table>
               </Card>
 
-              <Card className="border-none shadow-md h-fit">
+              <Card className="border-none shadow-md h-fit bg-white">
                 <CardHeader>
-                  <CardTitle className="text-base font-semibold">Weekly Trajectory</CardTitle>
+                  <CardTitle className="text-base font-semibold text-[#006600]">Weekly Trajectory</CardTitle>
                   <CardDescription>Visualizing visitor counts</CardDescription>
                 </CardHeader>
                 <CardContent className="h-[300px] p-4">
@@ -450,7 +457,7 @@ export default function AdminDashboard() {
                       <XAxis dataKey="date" />
                       <YAxis />
                       <Tooltip />
-                      <Bar dataKey="count" fill="#1a237e" />
+                      <Bar dataKey="count" fill="#006600" />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -459,9 +466,9 @@ export default function AdminDashboard() {
           </TabsContent>
 
           <TabsContent value="users">
-            <Card className="border-none shadow-md overflow-hidden">
+            <Card className="border-none shadow-md overflow-hidden bg-white">
               <CardHeader className="border-b bg-muted/30">
-                <CardTitle className="text-lg">User Directory</CardTitle>
+                <CardTitle className="text-lg text-[#006600]">User Directory</CardTitle>
                 <CardDescription>Granting permissions and managing security status.</CardDescription>
               </CardHeader>
               <Table>
@@ -493,7 +500,7 @@ export default function AdminDashboard() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={u.role === "admin" ? "default" : "secondary"} className="text-[10px] uppercase">
+                          <Badge variant={u.role === "admin" ? "default" : "secondary"} className={`text-[10px] uppercase ${u.role === 'admin' ? 'bg-[#006600]' : ''}`}>
                             {u.role}
                           </Badge>
                         </TableCell>
@@ -505,11 +512,11 @@ export default function AdminDashboard() {
                           )}
                         </TableCell>
                         <TableCell className="text-right space-x-2">
-                          <Button size="sm" variant="outline" className="h-8 text-[11px]" onClick={() => handleToggleRole(u.id, u.role)}>
+                          <Button size="sm" variant="outline" className="h-8 text-[11px] border-[#006600] text-[#006600] hover:bg-[#006600] hover:text-white" onClick={() => handleToggleRole(u.id, u.role)}>
                             {u.role === "admin" ? <UserMinus className="h-3 w-3 mr-1" /> : <Shield className="h-3 w-3 mr-1" />}
                             {u.role === "admin" ? "Demote" : "Promote"}
                           </Button>
-                          <Button size="sm" variant={u.isBlocked ? "default" : "destructive"} className="h-8 text-[11px]" onClick={() => handleToggleBlock(u.id, u.isBlocked)}>
+                          <Button size="sm" variant={u.isBlocked ? "default" : "destructive"} className={`h-8 text-[11px] ${u.isBlocked ? 'bg-[#006600] hover:bg-[#004d00]' : ''}`} onClick={() => handleToggleBlock(u.id, u.isBlocked)}>
                             {u.isBlocked ? <UserCheck className="h-3 w-3 mr-1" /> : <ShieldAlert className="h-3 w-3 mr-1" />}
                             {u.isBlocked ? "Unblock" : "Block"}
                           </Button>
@@ -524,9 +531,9 @@ export default function AdminDashboard() {
 
           <TabsContent value="quick-log">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <Card className="border-none shadow-md">
+              <Card className="border-none shadow-md bg-white">
                 <CardHeader>
-                  <CardTitle>Direct Manual Logging</CardTitle>
+                  <CardTitle className="text-[#006600]">Direct Manual Logging</CardTitle>
                   <CardDescription>Bypass self-service for manual visitor registration.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -538,13 +545,13 @@ export default function AdminDashboard() {
                       onChange={(e) => setQuickSearch(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleQuickLookup()}
                     />
-                    <Button onClick={handleQuickLookup}>Find User</Button>
+                    <Button onClick={handleQuickLookup} className="bg-[#006600] hover:bg-[#004d00]">Find User</Button>
                   </div>
 
                   {foundUser && (
                     <div className="p-4 border rounded-lg bg-muted/10 animate-in zoom-in-95 duration-200">
                       <div className="flex items-center gap-4 mb-4">
-                        <img src={foundUser.photoURL} className="w-12 h-12 rounded-full ring-1 ring-primary" alt="" referrerPolicy="no-referrer" />
+                        <img src={foundUser.photoURL} className="w-12 h-12 rounded-full ring-2 ring-[#006600]" alt="" referrerPolicy="no-referrer" />
                         <div>
                           <p className="font-bold">{foundUser.displayName}</p>
                           <p className="text-xs text-muted-foreground">{foundUser.email}</p>
@@ -553,7 +560,7 @@ export default function AdminDashboard() {
                       
                       <div className="space-y-4">
                         <div className="space-y-1.5">
-                          <Label className="text-xs">Reason for manual entry</Label>
+                          <Label className="text-xs font-semibold">Reason for manual entry</Label>
                           <Select onValueChange={setQuickReason} value={quickReason}>
                             <SelectTrigger className="h-9">
                               <SelectValue placeholder="Select purpose" />
@@ -565,7 +572,7 @@ export default function AdminDashboard() {
                             </SelectContent>
                           </Select>
                         </div>
-                        <Button className="w-full h-10" onClick={handleQuickLogVisit} disabled={!quickReason || isQuickLogging}>
+                        <Button className="w-full h-10 bg-[#006600] hover:bg-[#004d00] font-bold" onClick={handleQuickLogVisit} disabled={!quickReason || isQuickLogging}>
                           {isQuickLogging ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                           Execute Log
                         </Button>
@@ -575,11 +582,11 @@ export default function AdminDashboard() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-primary text-primary-foreground border-none shadow-lg h-fit">
+              <Card className="bg-[#006600] text-white border-none shadow-lg h-fit">
                 <CardHeader>
                   <CardTitle className="text-xl">Administrative Duty</CardTitle>
                 </CardHeader>
-                <CardContent className="text-sm space-y-4 text-primary-foreground/90 leading-relaxed">
+                <CardContent className="text-sm space-y-4 text-white/90 leading-relaxed">
                   <p>You are authorized to manage the data lifecycle of the NEU Library visitor system.</p>
                   <ul className="space-y-2 list-disc pl-4">
                     <li>Analyze visitor frequency for resource planning.</li>
@@ -587,7 +594,7 @@ export default function AdminDashboard() {
                     <li>Utilize AI for high-accuracy categorization of unspecified visits.</li>
                   </ul>
                   <div className="pt-4 flex items-center gap-2 font-semibold">
-                    <Shield className="h-5 w-5" />
+                    <Shield className="h-5 w-5 text-[#FFD700]" />
                     <span>Secure Admin Session Active</span>
                   </div>
                 </CardContent>
