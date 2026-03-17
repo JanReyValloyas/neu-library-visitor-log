@@ -7,21 +7,19 @@ import { getAuth, Auth } from 'firebase/auth';
 import { firebaseConfig } from './config';
 
 /**
- * Initializes Firebase services safely.
- * Returns nulls if on server-side or if config is missing to prevent build-time crashes.
+ * Initializes Firebase services safely for client-side use.
  */
 export function initializeFirebase(): {
   firebaseApp: FirebaseApp | null;
   firestore: Firestore | null;
   auth: Auth | null;
 } {
-  // Guard: Only initialize in the browser
   if (typeof window === 'undefined') {
     return { firebaseApp: null, firestore: null, auth: null };
   }
 
-  // Guard: Ensure we have at least an API key to avoid "invalid-api-key" error from SDK
   if (!firebaseConfig?.apiKey) {
+    console.warn('Firebase configuration is missing. Please check your environment variables.');
     return { firebaseApp: null, firestore: null, auth: null };
   }
 
@@ -32,7 +30,7 @@ export function initializeFirebase(): {
 
     return { firebaseApp, firestore, auth };
   } catch (error) {
-    // Fail gracefully to prevent hard crashes during build/hydration
+    console.error('Error initializing Firebase:', error);
     return { firebaseApp: null, firestore: null, auth: null };
   }
 }

@@ -1,8 +1,9 @@
+
 "use client";
 
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { db } from "@/lib/firebase";
+import { useFirestore } from "@/firebase";
 import { doc, updateDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +20,7 @@ const colleges = [
 
 export default function CompleteProfile() {
   const { profile, loading } = useAuth();
+  const db = useFirestore();
   const router = useRouter();
   
   const [program, setProgram] = useState("");
@@ -29,7 +31,7 @@ export default function CompleteProfile() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profile) return;
+    if (!profile || !db) return;
     if (!program || !college) {
       toast({ title: "Incomplete Form", description: "Please fill in all required fields.", variant: "destructive" });
       return;
@@ -45,9 +47,9 @@ export default function CompleteProfile() {
       });
       toast({ title: "Profile Updated", description: "Welcome to NEU Library!" });
       router.push("/dashboard");
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast({ title: "Error", description: "Failed to update profile.", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to update profile.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }

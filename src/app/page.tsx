@@ -8,17 +8,36 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { BookOpen, LogIn } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "@/hooks/use-toast";
 
 export default function Home() {
   const { loading } = useAuth();
   const auth = useAuthInstance();
-  const googleProvider = new GoogleAuthProvider();
 
   const handleLogin = async () => {
+    if (!auth) {
+      toast({
+        title: "Auth Error",
+        description: "Authentication service is not available.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const googleProvider = new GoogleAuthProvider();
+    googleProvider.setCustomParameters({
+      prompt: 'select_account'
+    });
+
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login failed:", error);
+      toast({
+        title: "Login Failed",
+        description: error.message || "An error occurred during sign in.",
+        variant: "destructive",
+      });
     }
   };
 

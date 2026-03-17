@@ -1,9 +1,10 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
 import { Navbar } from "@/components/navbar";
 import { useAuth } from "@/hooks/use-auth";
-import { db } from "@/lib/firebase";
+import { useFirestore } from "@/firebase";
 import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Calendar, Clock, BookOpen } from "lucide-react";
+import { Plus, Search, Calendar, BookOpen } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
@@ -22,6 +23,7 @@ const reasons = ["Reading", "Researching", "Use of Computer", "Meeting", "Borrow
 
 export default function Dashboard() {
   const { profile } = useAuth();
+  const db = useFirestore();
   const [visits, setVisits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -33,7 +35,7 @@ export default function Dashboard() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!profile) return;
+    if (!profile || !db) return;
     const q = query(
       collection(db, "visits"),
       where("uid", "==", profile.uid),
@@ -47,11 +49,11 @@ export default function Dashboard() {
     });
 
     return () => unsubscribe();
-  }, [profile]);
+  }, [profile, db]);
 
   const handleLogVisit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profile) return;
+    if (!profile || !db) return;
     if (!reason) {
       toast({ title: "Reason Required", description: "Please select a reason for your visit.", variant: "destructive" });
       return;
@@ -77,9 +79,9 @@ export default function Dashboard() {
       setIsOpen(false);
       setReason("");
       setOtherReason("");
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast({ title: "Error", description: "Failed to log visit.", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to log visit.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -101,7 +103,7 @@ export default function Dashboard() {
             <CardContent className="p-8">
               <div className="flex flex-col md:flex-row items-center gap-6">
                 <Avatar className="h-24 w-24 border-4 border-white/20">
-                  <AvatarImage src={profile.photoURL} />
+                  <AvatarImage src={profile.photoURL} referrerPolicy="no-referrer" />
                   <AvatarFallback className="text-3xl text-primary">{profile.displayName[0]}</AvatarFallback>
                 </Avatar>
                 <div className="text-center md:text-left space-y-2">

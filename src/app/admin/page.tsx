@@ -1,10 +1,11 @@
+
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
 import { Navbar } from "@/components/navbar";
 import { useAuth } from "@/hooks/use-auth";
-import { db } from "@/lib/firebase";
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, where, getDocs, addDoc, serverTimestamp, getDoc } from "firebase/firestore";
+import { useFirestore } from "@/firebase";
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -13,15 +14,17 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatsCards } from "@/components/admin/stats-cards";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { ChartTooltipContent } from "@/components/ui/chart";
 import { Bar, BarChart, XAxis, YAxis, ResponsiveContainer, CartesianGrid, Tooltip } from "recharts";
-import { Search, Download, Shield, ShieldAlert, UserCheck, UserMinus, UserPlus, Zap, Filter, Calendar as CalendarIcon } from "lucide-react";
+import { Search, Download, Shield, ShieldAlert, UserCheck, UserMinus, Zap, Filter } from "lucide-react";
+import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
-import { format, startOfDay, startOfWeek, startOfMonth, subDays, isSameDay, isWithinInterval, parseISO } from "date-fns";
+import { format, startOfDay, startOfWeek, startOfMonth, subDays, isSameDay } from "date-fns";
 import { classifyVisitReason } from "@/ai/flows/classify-visit-reason";
 
 export default function AdminDashboard() {
   const { profile } = useAuth();
+  const db = useFirestore();
   const [visits, setVisits] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,7 +34,6 @@ export default function AdminDashboard() {
   const [collegeFilter, setCollegeFilter] = useState("");
   const [employeeFilter, setEmployeeFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [timeRange, setTimeRange] = useState("all");
 
   // Quick Log
   const [quickSearch, setQuickSearch] = useState("");
@@ -39,6 +41,8 @@ export default function AdminDashboard() {
   const [quickReason, setQuickReason] = useState("");
 
   useEffect(() => {
+    if (!db) return;
+
     const visitsUnsubscribe = onSnapshot(
       query(collection(db, "visits"), orderBy("timestamp", "desc")),
       (snapshot) => {
@@ -58,7 +62,7 @@ export default function AdminDashboard() {
       visitsUnsubscribe();
       usersUnsubscribe();
     };
-  }, []);
+  }, [db]);
 
   // Stats Logic
   const stats = useMemo(() => {
@@ -104,12 +108,14 @@ export default function AdminDashboard() {
 
   // Handlers
   const handleToggleRole = async (uid: string, currentRole: string) => {
+    if (!db) return;
     const newRole = currentRole === "admin" ? "user" : "admin";
     await updateDoc(doc(db, "users", uid), { role: newRole });
     toast({ title: "Role Updated", description: `User is now a ${newRole}.` });
   };
 
   const handleToggleBlock = async (uid: string, currentStatus: boolean) => {
+    if (!db) return;
     await updateDoc(doc(db, "users", uid), { isBlocked: !currentStatus });
     toast({ 
       title: currentStatus ? "User Unblocked" : "User Blocked", 
@@ -119,7 +125,7 @@ export default function AdminDashboard() {
   };
 
   const handleQuickLookup = async () => {
-    if (!quickSearch) return;
+    if (!db || !quickSearch) return;
     const q = query(collection(db, "users"), where("email", "==", quickSearch));
     const snap = await getDocs(q);
     if (!snap.empty) {
@@ -131,7 +137,7 @@ export default function AdminDashboard() {
   };
 
   const handleQuickLogVisit = async () => {
-    if (!foundUser || !quickReason) return;
+    if (!db || !foundUser || !quickReason) return;
     try {
       await addDoc(collection(db, "visits"), {
         uid: foundUser.uid,
@@ -155,13 +161,12 @@ export default function AdminDashboard() {
   };
 
   const handleExportPDF = () => {
-    toast({ title: "Export Started", description: "Your PDF is being generated..." });
-    // In a real environment, jsPDF and autoTable would be imported.
-    // Since we cannot add packages, we simulate the action or advise on standard browser printing.
+    toast({ title: "Export Started", description: "Standard browser print dialog opened." });
     window.print();
   };
 
   const handleAIDiagnosis = async (visitId: string, currentReason: string) => {
+    if (!db) return;
     toast({ title: "AI Classifier", description: "Processing reason category..." });
     try {
       const result = await classifyVisitReason({ reason: currentReason });
@@ -267,7 +272,11 @@ export default function AdminDashboard() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredVisits.length === 0 ? (
+                      {loading ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-12">Loading visits...</TableCell>
+                        </TableRow>
+                      ) : filteredVisits.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
                             No visitor records found.
@@ -375,7 +384,7 @@ export default function AdminDashboard() {
                     <TableRow key={u.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <img src={u.photoURL} className="w-8 h-8 rounded-full" />
+                          <img src={u.photoURL} className="w-8 h-8 rounded-full" referrerPolicy="no-referrer" />
                           <div className="flex flex-col">
                             <span className="font-bold">{u.displayName}</span>
                             <span className="text-xs text-muted-foreground">{u.email}</span>
@@ -450,7 +459,7 @@ export default function AdminDashboard() {
                   {foundUser && (
                     <div className="p-6 border rounded-xl bg-muted/20 animate-in zoom-in-95 duration-200">
                       <div className="flex items-center gap-4 mb-6">
-                        <img src={foundUser.photoURL} className="w-16 h-16 rounded-full ring-2 ring-primary ring-offset-2" />
+                        <img src={foundUser.photoURL} className="w-16 h-16 rounded-full ring-2 ring-primary ring-offset-2" referrerPolicy="no-referrer" />
                         <div>
                           <h3 className="text-xl font-bold">{foundUser.displayName}</h3>
                           <p className="text-sm text-muted-foreground">{foundUser.email}</p>
