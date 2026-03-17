@@ -1,22 +1,27 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { useAuthInstance } from "@/firebase";
+import { useAuthInstance, useFirestore } from "@/firebase";
 import { GoogleAuthProvider, signInWithRedirect, getRedirectResult } from "firebase/auth";
+import { collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LogIn, Loader2, ArrowRight, Shield, CreditCard } from "lucide-react";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth, UserProfile } from "@/hooks/use-auth";
 import { toast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 export default function Home() {
   const { loading: authLoading } = useAuth();
   const auth = useAuthInstance();
+  const db = useFirestore();
   const [redirecting, setRedirecting] = useState(false);
   const [rfid, setRfid] = useState("");
+  const [isLoggingId, setIsLoggingId] = useState(false);
 
   useEffect(() => {
     if (!auth) return;
@@ -29,11 +34,13 @@ export default function Home() {
         }
       } catch (error: any) {
         console.error("Error handling redirect result:", error);
-        toast({
-          title: "Sign-in Error",
-          description: error.message || "An error occurred during sign-in.",
-          variant: "destructive",
-        });
+        if (error.code !== 'auth/popup-closed-by-user') {
+          toast({
+            title: "Sign-in Error",
+            description: error.message || "An error occurred during sign-in.",
+            variant: "destructive",
+          });
+        }
       }
     };
 
@@ -58,12 +65,66 @@ export default function Home() {
     }
   };
 
-  const handleRfidSubmit = (e: React.FormEvent) => {
+  const handleRfidSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "RFID Entry",
-      description: "Direct RFID logging is currently being provisioned. Please use Google Sign-in for now.",
-    });
+    if (!db || !rfid.trim()) return;
+
+    setIsLoggingId(true);
+    try {
+      const q = query(collection(db, "users"), where("studentId", "==", rfid.trim()));
+      const snap = await getDocs(q);
+
+      if (snap.empty) {
+        toast({
+          title: "Access Denied",
+          description: "ID not registered. Please sign in with Google first.",
+          variant: "destructive",
+        });
+        setIsLoggingId(false);
+        return;
+      }
+
+      const userData = snap.docs[0].data() as UserProfile;
+
+      if (userData.isBlocked) {
+        toast({
+          title: "Account Restricted",
+          description: "Your account is currently blocked. Please see the administrator.",
+          variant: "destructive",
+        });
+        setIsLoggingId(false);
+        return;
+      }
+
+      await addDoc(collection(db, "visits"), {
+        uid: userData.uid,
+        displayName: userData.displayName,
+        email: userData.email,
+        program: userData.program || "Unknown",
+        college: userData.college || "Unknown",
+        isEmployee: userData.isEmployee || false,
+        employeeType: userData.employeeType || "",
+        reason: "ID Entry (General)",
+        timestamp: serverTimestamp(),
+        date: format(new Date(), "yyyy-MM-dd"),
+        studentId: userData.studentId
+      });
+
+      toast({
+        title: `Welcome, ${userData.displayName}!`,
+        description: "Your library visit has been successfully recorded.",
+      });
+      setRfid("");
+    } catch (error: any) {
+      console.error("ID Lookup Error:", error);
+      toast({
+        title: "System Error",
+        description: "Could not process ID at this time.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoggingId(false);
+    }
   };
 
   if (authLoading || redirecting) {
@@ -79,12 +140,10 @@ export default function Home() {
 
   return (
     <div className="min-h-screen relative flex items-center justify-center p-4 bg-[#f5f8f5] overflow-hidden font-['Lexend']">
-      {/* Background Blobs */}
       <div className="absolute top-[-10%] right-[-5%] w-96 h-96 bg-[#006600]/10 rounded-full blur-3xl" />
       <div className="absolute bottom-[-10%] left-[-5%] w-96 h-96 bg-[#FFD700]/10 rounded-full blur-3xl" />
 
       <Card className="w-full max-w-[28rem] shadow-2xl rounded-2xl overflow-hidden border-none z-10">
-        {/* TOP HEADER SECTION */}
         <div className="bg-[#006600] p-8 flex flex-col items-center space-y-4">
           <div className="bg-white p-3 rounded-2xl shadow-lg">
             <Image 
@@ -100,14 +159,12 @@ export default function Home() {
           <div className="w-16 h-1 bg-[#FFD700] rounded-full" />
         </div>
 
-        {/* MIDDLE CARD SECTION */}
         <CardContent className="bg-white p-8 space-y-8">
           <div className="space-y-1">
             <h2 className="text-xl font-bold text-slate-800">Library Visitor Log</h2>
             <p className="text-slate-500 text-sm font-medium">Welcome back, Eagle! Please record your visit.</p>
           </div>
 
-          {/* RFID INPUT SECTION */}
           <form onSubmit={handleRfidSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label className="text-[10px] font-bold text-[#006600] tracking-widest uppercase">
@@ -120,29 +177,33 @@ export default function Home() {
                   className="pl-10 h-12 bg-slate-50 border-slate-200 focus:border-[#006600] focus:ring-[#006600]/20 rounded-xl"
                   value={rfid}
                   onChange={(e) => setRfid(e.target.value)}
+                  disabled={isLoggingId}
                 />
               </div>
             </div>
-            <Button className="w-full h-12 bg-[#006600] hover:bg-[#004d00] text-white font-bold tracking-widest rounded-xl transition-all shadow-md group">
+            <Button 
+              type="submit"
+              className="w-full h-12 bg-[#006600] hover:bg-[#004d00] text-white font-bold tracking-widest rounded-xl transition-all shadow-md group"
+              disabled={isLoggingId || !rfid.trim()}
+            >
+              {isLoggingId ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               LOG VISIT
               <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
             </Button>
           </form>
 
-          {/* DIVIDER */}
           <div className="relative flex items-center">
             <div className="flex-grow border-t border-slate-200"></div>
             <span className="flex-shrink mx-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">OR</span>
             <div className="flex-grow border-t border-slate-200"></div>
           </div>
 
-          {/* GOOGLE SIGN IN */}
           <div className="space-y-4">
             <Button 
               variant="outline" 
               className="w-full h-12 border-slate-200 hover:border-[#006600] hover:bg-slate-50 rounded-xl transition-all font-medium flex items-center justify-center gap-3"
               onClick={handleLogin}
-              disabled={redirecting}
+              disabled={redirecting || isLoggingId}
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24">
                 <path
@@ -170,7 +231,6 @@ export default function Home() {
           </div>
         </CardContent>
 
-        {/* FOOTER */}
         <div className="bg-[#f5f8f5] p-5 border-t border-slate-100 text-center flex items-center justify-center gap-2">
           <Shield className="h-3 w-3 text-[#006600]" />
           <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">

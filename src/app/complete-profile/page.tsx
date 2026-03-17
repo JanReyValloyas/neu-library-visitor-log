@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
@@ -19,6 +20,7 @@ export default function CompleteProfile() {
   const db = useFirestore();
   const router = useRouter();
   
+  const [studentId, setStudentId] = useState("");
   const [college, setCollege] = useState("");
   const [program, setProgram] = useState("");
   const [isEmployee, setIsEmployee] = useState(false);
@@ -32,13 +34,13 @@ export default function CompleteProfile() {
 
   const handleCollegeChange = (val: string) => {
     setCollege(val);
-    setProgram(""); // Reset program when college changes
+    setProgram("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile || !db) return;
-    if (!program || !college) {
+    if (!program || !college || !studentId) {
       toast({ title: "Incomplete Form", description: "Please fill in all required fields.", variant: "destructive" });
       return;
     }
@@ -46,6 +48,7 @@ export default function CompleteProfile() {
     setIsSubmitting(true);
     try {
       await updateDoc(doc(db, "users", profile.uid), {
+        studentId: studentId.trim(),
         program,
         college,
         isEmployee,
@@ -73,9 +76,22 @@ export default function CompleteProfile() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
+              <Label htmlFor="studentId">Student / Employee ID</Label>
+              <Input 
+                id="studentId"
+                placeholder="e.g. 24-12377-943"
+                value={studentId}
+                onChange={(e) => setStudentId(e.target.value)}
+                className="h-11"
+                required
+              />
+              <p className="text-[10px] text-muted-foreground">This ID can be used for quick logging at the library entrance.</p>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="college">College</Label>
               <Select onValueChange={handleCollegeChange} value={college}>
-                <SelectTrigger id="college">
+                <SelectTrigger id="college" className="h-11">
                   <SelectValue placeholder="Select your college" />
                 </SelectTrigger>
                 <SelectContent>
@@ -89,7 +105,7 @@ export default function CompleteProfile() {
             <div className="space-y-2">
               <Label htmlFor="program">Department / Program</Label>
               <Select onValueChange={setProgram} value={program} disabled={!college}>
-                <SelectTrigger id="program">
+                <SelectTrigger id="program" className="h-11">
                   <SelectValue placeholder={college ? "Select your program" : "Select college first"} />
                 </SelectTrigger>
                 <SelectContent>
@@ -100,7 +116,7 @@ export default function CompleteProfile() {
               </Select>
             </div>
 
-            <div className="flex items-center justify-between space-x-2 py-2 border rounded-lg px-4 bg-white">
+            <div className="flex items-center justify-between space-x-2 py-3 border rounded-lg px-4 bg-white">
               <Label htmlFor="is-employee" className="flex flex-col gap-1 cursor-pointer">
                 <span className="font-semibold">Are you an employee?</span>
                 <span className="font-normal text-xs text-muted-foreground">Toggle if you are faculty or staff</span>
@@ -116,7 +132,7 @@ export default function CompleteProfile() {
               <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
                 <Label htmlFor="employee-type">Employee Type</Label>
                 <Select onValueChange={setEmployeeType} value={employeeType}>
-                  <SelectTrigger id="employee-type">
+                  <SelectTrigger id="employee-type" className="h-11">
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -129,7 +145,7 @@ export default function CompleteProfile() {
 
             <Button 
               type="submit" 
-              className="w-full bg-[#006600] hover:bg-[#004d00] text-white font-bold h-12 rounded-xl transition-all shadow-md" 
+              className="w-full bg-[#006600] hover:bg-[#004d00] text-white font-bold h-12 rounded-xl transition-all shadow-md mt-4" 
               disabled={isSubmitting}
             >
               {isSubmitting ? "Saving..." : "Start Logging Visits"}

@@ -19,6 +19,7 @@ export interface UserProfile {
   college?: string;
   isEmployee?: boolean;
   employeeType?: string;
+  studentId?: string;
   createdAt: any;
 }
 
@@ -61,8 +62,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (!auth || !db) return;
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log("Auth State:", firebaseUser ? `Logged in as ${firebaseUser.email}` : "Logged out");
-      
       if (firebaseUser) {
         setUser(firebaseUser);
         try {
@@ -109,7 +108,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => unsubscribeAuth();
   }, [auth, db]);
 
-  // Real-time updates for blocked status or role changes
   useEffect(() => {
     if (user && db && auth) {
       const unsubscribeProfile = onSnapshot(doc(db, "users", user.uid), (doc) => {
@@ -128,7 +126,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [user, db, auth, router]);
 
-  // Route guarding
   useEffect(() => {
     if (!loading) {
       const isPublicRoute = pathname === "/";
@@ -139,14 +136,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (!user) {
         if (!isPublicRoute) router.push("/");
       } else if (profile) {
-        // Force profile completion if basic info is missing
         if (!profile.program && !isProfileRoute && !isAdminRoute) {
           router.push("/complete-profile");
         } else if (profile.role === "admin") {
-          // Admins on user dashboard or login are sent to admin dashboard
           if (isDashboardRoute || isPublicRoute) router.push("/admin");
         } else {
-          // Regular users on admin routes or login are sent to user dashboard
           if (isAdminRoute || isPublicRoute) router.push("/dashboard");
         }
       }

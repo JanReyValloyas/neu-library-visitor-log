@@ -16,6 +16,7 @@
         "college": { "type": "string" },
         "isEmployee": { "type": "boolean" },
         "employeeType": { "type": "string" },
+        "studentId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "email", "role", "isBlocked"]
@@ -35,6 +36,7 @@
         "reason": { "type": "string" },
         "timestamp": { "type": "object" },
         "date": { "type": "string" },
+        "studentId": { "type": "string" },
         "aiClassified": { "type": "string" },
         "aiSuggestion": { "type": "string" },
         "aiExplanation": { "type": "string" }

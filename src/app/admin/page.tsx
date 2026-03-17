@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { Navbar } from "@/components/navbar";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth, UserProfile } from "@/hooks/use-auth";
 import { useFirestore } from "@/firebase";
 import { 
   collection, 
@@ -47,24 +47,10 @@ interface Visit {
   reason: string;
   timestamp: Timestamp | null;
   date: string;
+  studentId?: string;
   aiClassified?: string;
   aiSuggestion?: string;
   aiExplanation?: string;
-}
-
-interface UserProfile {
-  id: string;
-  uid: string;
-  email: string;
-  displayName: string;
-  photoURL: string;
-  role: "user" | "admin";
-  isBlocked: boolean;
-  program?: string;
-  college?: string;
-  isEmployee?: boolean;
-  employeeType?: string;
-  createdAt: Timestamp | null;
 }
 
 export default function AdminDashboard() {
@@ -75,13 +61,11 @@ export default function AdminDashboard() {
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Filters
   const [reasonFilter, setReasonFilter] = useState("all");
   const [collegeFilter, setCollegeFilter] = useState("all");
   const [employeeFilter, setEmployeeFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Quick Log
   const [quickSearch, setQuickSearch] = useState("");
   const [foundUser, setFoundUser] = useState<UserProfile | null>(null);
   const [quickReason, setQuickReason] = useState("");
@@ -180,7 +164,8 @@ export default function AdminDashboard() {
       const matchEmployee = employeeFilter === "all" || (employeeFilter === "employee" ? v.isEmployee : !v.isEmployee);
       const matchSearch = !searchTerm || 
         (v.displayName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (v.email || "").toLowerCase().includes(searchTerm.toLowerCase());
+        (v.email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (v.studentId || "").toLowerCase().includes(searchTerm.toLowerCase());
       return matchReason && matchCollege && matchEmployee && matchSearch;
     });
   }, [visits, reasonFilter, collegeFilter, employeeFilter, searchTerm]);
@@ -209,13 +194,22 @@ export default function AdminDashboard() {
   const handleQuickLookup = async () => {
     if (!db || !quickSearch) return;
     try {
-      const q = query(collection(db, "users"), where("email", "==", quickSearch.trim()));
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        setFoundUser({ id: snap.docs[0].id, ...snap.docs[0].data() } as UserProfile);
+      const qEmail = query(collection(db, "users"), where("email", "==", quickSearch.trim()));
+      const snapEmail = await getDocs(qEmail);
+      
+      if (!snapEmail.empty) {
+        setFoundUser({ id: snapEmail.docs[0].id, ...snapEmail.docs[0].data() } as UserProfile);
+        return;
+      }
+
+      const qId = query(collection(db, "users"), where("studentId", "==", quickSearch.trim()));
+      const snapId = await getDocs(qId);
+
+      if (!snapId.empty) {
+        setFoundUser({ id: snapId.docs[0].id, ...snapId.docs[0].data() } as UserProfile);
       } else {
         setFoundUser(null);
-        toast({ title: "Not Found", description: "No user matches this email.", variant: "destructive" });
+        toast({ title: "Not Found", description: "No user matches this email or ID.", variant: "destructive" });
       }
     } catch (e) {
       toast({ title: "Lookup Error", variant: "destructive" });
@@ -237,6 +231,7 @@ export default function AdminDashboard() {
         reason: quickReason,
         timestamp: serverTimestamp(),
         date: format(new Date(), "yyyy-MM-dd"),
+        studentId: foundUser.studentId
       });
       toast({ title: "Visit Logged", description: `Manual entry for ${foundUser.displayName} complete.` });
       setFoundUser(null);
@@ -332,7 +327,7 @@ export default function AdminDashboard() {
                     <div className="relative w-full md:w-64">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input 
-                        placeholder="Search visitor or email..." 
+                        placeholder="Search name, email, or ID..." 
                         className="pl-10 h-9 bg-white"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -346,7 +341,7 @@ export default function AdminDashboard() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Reasons</SelectItem>
-                        {["Reading", "Researching", "Use of Computer", "Meeting", "Borrowing Books", "Other"].map(r => (
+                        {["Reading", "Researching", "Use of Computer", "Meeting", "Borrowing Books", "ID Entry (General)", "Other"].map(r => (
                           <SelectItem key={r} value={r}>{r}</SelectItem>
                         ))}
                       </SelectContent>
@@ -399,7 +394,7 @@ export default function AdminDashboard() {
                           <TableCell>
                             <div className="flex flex-col">
                               <span className="font-bold text-sm">{visit.displayName || "Unknown User"}</span>
-                              <span className="text-[11px] text-muted-foreground">{visit.email || "N/A"}</span>
+                              <span className="text-[11px] text-muted-foreground">{visit.studentId || visit.email || "N/A"}</span>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -495,7 +490,7 @@ export default function AdminDashboard() {
                             <img src={u.photoURL || `https://picsum.photos/seed/${u.id}/32/32`} className="w-8 h-8 rounded-full bg-muted object-cover" alt={u.displayName} />
                             <div className="flex flex-col">
                               <span className="font-bold text-sm">{u.displayName || "Unnamed"}</span>
-                              <span className="text-[11px] text-muted-foreground">{u.email}</span>
+                              <span className="text-[11px] text-muted-foreground">{u.studentId || u.email}</span>
                             </div>
                           </div>
                         </TableCell>
@@ -512,11 +507,11 @@ export default function AdminDashboard() {
                           )}
                         </TableCell>
                         <TableCell className="text-right space-x-2">
-                          <Button size="sm" variant="outline" className="h-8 text-[11px] border-[#006600] text-[#006600] hover:bg-[#006600] hover:text-white" onClick={() => handleToggleRole(u.id, u.role)}>
+                          <Button size="sm" variant="outline" className="h-8 text-[11px] border-[#006600] text-[#006600] hover:bg-[#006600] hover:text-white" onClick={() => handleToggleRole(u.uid, u.role)}>
                             {u.role === "admin" ? <UserMinus className="h-3 w-3 mr-1" /> : <Shield className="h-3 w-3 mr-1" />}
                             {u.role === "admin" ? "Demote" : "Promote"}
                           </Button>
-                          <Button size="sm" variant={u.isBlocked ? "default" : "destructive"} className={`h-8 text-[11px] ${u.isBlocked ? 'bg-[#006600] hover:bg-[#004d00]' : ''}`} onClick={() => handleToggleBlock(u.id, u.isBlocked)}>
+                          <Button size="sm" variant={u.isBlocked ? "default" : "destructive"} className={`h-8 text-[11px] ${u.isBlocked ? 'bg-[#006600] hover:bg-[#004d00]' : ''}`} onClick={() => handleToggleBlock(u.uid, u.isBlocked)}>
                             {u.isBlocked ? <UserCheck className="h-3 w-3 mr-1" /> : <ShieldAlert className="h-3 w-3 mr-1" />}
                             {u.isBlocked ? "Unblock" : "Block"}
                           </Button>
@@ -534,12 +529,12 @@ export default function AdminDashboard() {
               <Card className="border-none shadow-md bg-white">
                 <CardHeader>
                   <CardTitle className="text-[#006600]">Direct Manual Logging</CardTitle>
-                  <CardDescription>Bypass self-service for manual visitor registration.</CardDescription>
+                  <CardDescription>Bypass self-service for manual visitor registration by Email or ID.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="flex gap-2">
                     <Input 
-                      placeholder="Enter visitor email..." 
+                      placeholder="Enter visitor email or Student ID..." 
                       className="flex-1"
                       value={quickSearch}
                       onChange={(e) => setQuickSearch(e.target.value)}
@@ -554,7 +549,7 @@ export default function AdminDashboard() {
                         <img src={foundUser.photoURL} className="w-12 h-12 rounded-full ring-2 ring-[#006600]" alt="" referrerPolicy="no-referrer" />
                         <div>
                           <p className="font-bold">{foundUser.displayName}</p>
-                          <p className="text-xs text-muted-foreground">{foundUser.email}</p>
+                          <p className="text-xs text-muted-foreground">{foundUser.studentId || foundUser.email}</p>
                         </div>
                       </div>
                       
@@ -566,7 +561,7 @@ export default function AdminDashboard() {
                               <SelectValue placeholder="Select purpose" />
                             </SelectTrigger>
                             <SelectContent>
-                              {["Reading", "Researching", "Use of Computer", "Meeting", "Borrowing Books", "Other"].map(r => (
+                              {["Reading", "Researching", "Use of Computer", "Meeting", "Borrowing Books", "ID Entry (General)", "Other"].map(r => (
                                 <SelectItem key={r} value={r}>{r}</SelectItem>
                               ))}
                             </SelectContent>
@@ -591,7 +586,7 @@ export default function AdminDashboard() {
                   <ul className="space-y-2 list-disc pl-4">
                     <li>Analyze visitor frequency for resource planning.</li>
                     <li>Audit user status for security compliance.</li>
-                    <li>Utilize AI for high-accuracy categorization of unspecified visits.</li>
+                    <li>Utilize Student ID lookups for quick manual entry.</li>
                   </ul>
                   <div className="pt-4 flex items-center gap-2 font-semibold">
                     <Shield className="h-5 w-5 text-[#FFD700]" />
