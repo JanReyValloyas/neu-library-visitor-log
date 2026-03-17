@@ -3,27 +3,84 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { auth } from "@/firebase/index";
+import { auth, db } from "@/firebase/index";
 import { useAuth } from "@/hooks/useAuth";
-import { Loader2 } from "lucide-react";
+import { collection, query, where, getDocs, limit } from "firebase/firestore";
+import { Loader2, UserCircle } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 export default function LoginPage() {
-  const { user, role, profileComplete, loading } = useAuth();
+  const { user, role, loading } = useAuth();
   const router = useRouter();
   const [signingIn, setSigningIn] = useState(false);
+  const [idLoading, setIdLoading] = useState(false);
+  const [studentIdInput, setStudentIdInput] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!loading && user && role) {
-      if (profileComplete === false) {
-        router.replace("/complete-profile");
-      } else if (role === "admin") {
+      if (role === "admin") {
         router.replace("/admin");
       } else {
         router.replace("/dashboard");
       }
     }
-  }, [user, role, profileComplete, loading, router]);
+  }, [user, role, loading, router]);
+
+  const handleIdLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!studentIdInput.trim()) {
+      toast({ title: "ID Required", description: "Please enter your Student or Employee ID.", variant: "destructive" });
+      return;
+    }
+
+    setIdLoading(true);
+    setError("");
+
+    try {
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("studentId", "==", studentIdInput.trim()), limit(1));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        setError("ID not registered. Please sign in with Google first.");
+        setIdLoading(false);
+        return;
+      }
+
+      const userData = querySnapshot.docs[0].data();
+
+      if (userData.isBlocked) {
+        setError("You are not allowed to use the library. Please contact the administrator.");
+        setIdLoading(false);
+        return;
+      }
+
+      if (!userData.profileComplete) {
+        setError("Please complete your profile first by signing in with Google.");
+        setIdLoading(false);
+        return;
+      }
+
+      // Success: Store user data in sessionStorage for quick check-in
+      sessionStorage.setItem("quickVisitUser", JSON.stringify({
+        uid: userData.uid,
+        displayName: userData.displayName,
+        program: userData.program,
+        college: userData.college || "N/A",
+        visitorType: userData.visitorType,
+        yearLevel: userData.yearLevel || "N/A",
+        studentId: userData.studentId,
+      }));
+
+      router.push("/checkin");
+    } catch (err: any) {
+      console.error("ID Login Error:", err);
+      setError("An error occurred. Please try again.");
+    } finally {
+      setIdLoading(false);
+    }
+  };
 
   const handleGoogleSignIn = async () => {
     setSigningIn(true);
@@ -38,7 +95,7 @@ export default function LoginPage() {
     }
   };
 
-  if (loading || (user && role && profileComplete !== null)) {
+  if (loading || (user && role)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f5f8f5]">
         <div className="flex flex-col items-center gap-4">
@@ -64,25 +121,39 @@ export default function LoginPage() {
             <h2 className="text-xl font-bold text-slate-800">Library Visitor Log</h2>
             <p className="text-slate-500 text-sm mt-1">Welcome back, Eagle! Please record your visit.</p>
           </div>
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-[#006600] uppercase tracking-wider">
-              Institutional ID Access
-            </label>
-            <input
-              type="text"
-              placeholder="RFID or Institutional ID Number"
-              className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[#006600]"
-            />
-            <button className="w-full bg-[#006600] text-white py-3 rounded-lg font-bold uppercase tracking-wider hover:bg-green-800 transition">
-              Log Visit →
-            </button>
-          </div>
+          <form onSubmit={handleIdLogin} className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-[#006600] uppercase tracking-wider">
+                Institutional ID Access
+              </label>
+              <div className="relative">
+                <UserCircle className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="RFID or Student ID Number"
+                  value={studentIdInput}
+                  onChange={(e) => setStudentIdInput(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-[#006600] focus:ring-1 focus:ring-[#006600]"
+                />
+              </div>
+              <button 
+                type="submit"
+                disabled={idLoading}
+                className="w-full bg-[#006600] text-white py-3 rounded-lg font-bold uppercase tracking-wider hover:bg-green-800 transition flex items-center justify-center gap-2"
+              >
+                {idLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Log Visit →"}
+              </button>
+            </div>
+          </form>
+
           <div className="relative flex items-center">
             <div className="flex-grow border-t border-gray-200"></div>
             <span className="mx-4 text-xs text-gray-400 uppercase">or</span>
             <div className="flex-grow border-t border-gray-200"></div>
           </div>
-          {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+
+          {error && <p className="text-red-500 text-xs text-center font-bold px-4">{error}</p>}
+          
           <button
             onClick={handleGoogleSignIn}
             disabled={signingIn}
@@ -96,12 +167,13 @@ export default function LoginPage() {
             </svg>
             {signingIn ? "Signing in..." : "Sign in with Google"}
           </button>
+          
           <p className="text-[10px] text-center text-gray-400 uppercase tracking-widest">
             Access restricted to <span className="text-[#006600] font-bold">@neu.edu.ph</span> accounts only
           </p>
         </div>
-        <div className="bg-[#f5f8f5] p-4 text-center">
-          <p className="text-xs text-gray-400">🛡️ Secure Academic Portal © 2024 NEU</p>
+        <div className="bg-[#f5f8f5] p-4 text-center border-t">
+          <p className="text-xs text-gray-400 uppercase tracking-widest font-bold">🛡️ Secure Academic Portal © 2024 NEU</p>
         </div>
       </div>
     </div>
