@@ -2,42 +2,24 @@
 
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getFirestore, Firestore } from 'firebase/firestore';
-import { getAuth, Auth, browserLocalPersistence, setPersistence } from 'firebase/auth';
+import { getAuth, Auth } from 'firebase/auth';
 import { firebaseConfig } from './config';
 
 /**
- * Initializes Firebase services safely for client-side use.
+ * Initializes Firebase and returns the core service instances.
+ * This is used by the FirebaseClientProvider for application-wide context.
  */
-export function initializeFirebase(): {
-  firebaseApp: FirebaseApp | null;
-  firestore: Firestore | null;
-  auth: Auth | null;
-} {
-  if (typeof window === 'undefined') {
-    return { firebaseApp: null, firestore: null, auth: null };
-  }
-
-  if (!firebaseConfig?.apiKey) {
-    console.warn('Firebase configuration is missing. Please check your environment variables.');
-    return { firebaseApp: null, firestore: null, auth: null };
-  }
-
-  try {
-    const firebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-    const firestore = getFirestore(firebaseApp);
-    const auth = getAuth(firebaseApp);
-
-    // Set persistence to local to ensure session survives refreshes
-    setPersistence(auth, browserLocalPersistence).catch((error) => {
-      console.error('Error setting auth persistence:', error);
-    });
-
-    return { firebaseApp, firestore, auth };
-  } catch (error) {
-    console.error('Error initializing Firebase:', error);
-    return { firebaseApp: null, firestore: null, auth: null };
-  }
+export function initializeFirebase() {
+  const firebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+  const auth = getAuth(firebaseApp);
+  const firestore = getFirestore(firebaseApp);
+  return { firebaseApp, auth, firestore };
 }
+
+// Initialize singleton instances for direct import in hooks/components
+const instances = initializeFirebase();
+export const auth: Auth = instances.auth;
+export const db: Firestore = instances.firestore;
 
 export * from './provider';
 export * from './auth/use-user';

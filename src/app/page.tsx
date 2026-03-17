@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { useAuthInstance, useFirestore } from "@/firebase";
+import { auth, db } from "@/firebase/index";
 import { GoogleAuthProvider, signInWithRedirect, getRedirectResult } from "firebase/auth";
 import { collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
@@ -10,33 +10,29 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LogIn, Loader2, ArrowRight, Shield, CreditCard } from "lucide-react";
-import { useAuth, UserProfile } from "@/hooks/use-auth";
+import { useAuth } from "@/hooks/use-auth";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
 
 export default function Home() {
-  const { user, profile, loading: authLoading } = useAuth();
-  const auth = useAuthInstance();
-  const db = useFirestore();
+  const { user, role, loading } = useAuth();
   const router = useRouter();
   const [redirecting, setRedirecting] = useState(false);
   const [rfid, setRfid] = useState("");
   const [isLoggingId, setIsLoggingId] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && user && profile) {
-      if (profile.role === 'admin') {
-        router.push('/admin');
+    if (!loading && user && role) {
+      if (role === "admin") {
+        router.replace("/admin");
       } else {
-        router.push('/dashboard');
+        router.replace("/dashboard");
       }
     }
-  }, [user, profile, authLoading, router]);
+  }, [user, role, loading, router]);
 
   useEffect(() => {
-    if (!auth) return;
-
     const checkRedirectResult = async () => {
       try {
         const result = await getRedirectResult(auth);
@@ -56,10 +52,9 @@ export default function Home() {
     };
 
     checkRedirectResult();
-  }, [auth]);
+  }, []);
 
   const handleLogin = async () => {
-    if (!auth) return;
     const googleProvider = new GoogleAuthProvider();
     googleProvider.setCustomParameters({ prompt: 'select_account' });
 
@@ -95,7 +90,7 @@ export default function Home() {
         return;
       }
 
-      const userData = snap.docs[0].data() as UserProfile;
+      const userData = snap.docs[0].data();
 
       if (userData.isBlocked) {
         toast({
@@ -138,7 +133,7 @@ export default function Home() {
     }
   };
 
-  if (authLoading || redirecting || (user && profile)) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f5f8f5]">
         <div className="flex flex-col items-center gap-4">
@@ -148,6 +143,8 @@ export default function Home() {
       </div>
     );
   }
+
+  if (user) return null;
 
   return (
     <div className="min-h-screen relative flex items-center justify-center p-4 bg-[#f5f8f5] overflow-hidden font-['Lexend']">
