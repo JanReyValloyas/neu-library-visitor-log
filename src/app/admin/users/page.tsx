@@ -1,23 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAuth } from "@/hooks/use-auth";
-import { useFirestore } from "@/firebase";
-import { collection, query, orderBy, onSnapshot, doc, updateDoc } from "firebase/firestore";
+import { useAuth } from "@/hooks/useAuth";
+import { db } from "@/firebase/index";
+import { 
+  collection, 
+  query, 
+  orderBy, 
+  onSnapshot, 
+  doc, 
+  updateDoc 
+} from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { 
-  Menu, 
   Bell, 
   Search, 
   Filter, 
-  ShieldAlert, 
-  ShieldCheck,
-  UserCheck,
-  UserMinus
+  Menu,
+  Loader2
 } from "lucide-react";
 import { BottomNav } from "@/components/admin/bottom-nav";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +39,7 @@ interface UserProfile {
 }
 
 export default function UsersManagement() {
-  const db = useFirestore();
+  const { user: currentUser, role: currentRole, loading: authLoading } = useAuth();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "blocked">("all");
@@ -44,11 +48,18 @@ export default function UsersManagement() {
   useEffect(() => {
     if (!db) return;
     const q = query(collection(db, "users"), orderBy("createdAt", "desc"));
-    return onSnapshot(q, (snapshot) => {
-      setUsers(snapshot.docs.map(d => ({ uid: d.id, ...d.data() } as UserProfile)));
-      setLoading(false);
-    });
-  }, [db]);
+    const unsubscribe = onSnapshot(q, 
+      (snapshot) => {
+        setUsers(snapshot.docs.map(d => ({ uid: d.id, ...d.data() } as UserProfile)));
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Error fetching users:", error);
+        setLoading(false);
+      }
+    );
+    return () => unsubscribe();
+  }, []);
 
   const handleToggleBlock = async (uid: string, currentStatus: boolean) => {
     if (!db) return;
@@ -71,50 +82,59 @@ export default function UsersManagement() {
     return matchesSearch;
   });
 
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f5f8f5]">
+        <Loader2 className="h-10 w-10 animate-spin text-[#006600]" />
+      </div>
+    );
+  }
+
+  if (!currentUser || currentRole !== 'admin') {
+    return <div className="p-6 text-center">Unauthorized Access</div>;
+  }
+
   return (
     <div className="flex flex-col min-h-screen pb-20">
-      {/* Header */}
       <header className="p-6 flex items-center justify-between bg-white border-b sticky top-0 z-10">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" className="h-8 w-8">
-            <Menu className="h-6 w-6" />
+            <Menu className="h-6 w-6 text-slate-600" />
           </Button>
-          <h1 className="font-bold text-lg">Users Management</h1>
+          <h1 className="font-bold text-lg text-slate-800">Users Management</h1>
         </div>
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" className="h-8 w-8">
-            <Bell className="h-5 w-5" />
+            <Bell className="h-5 w-5 text-slate-600" />
           </Button>
-          <div className="h-8 w-8 bg-[#D4AF37] rounded-full flex items-center justify-center text-white font-bold text-[10px]">
+          <div className="h-8 w-8 bg-[#D4AF37] rounded-full flex items-center justify-center text-white font-bold text-[10px] shadow-sm">
             AD
           </div>
         </div>
       </header>
 
-      <main className="p-4 space-y-6">
-        {/* Search */}
+      <main className="p-4 space-y-6 animate-in fade-in duration-500">
         <div className="flex gap-2">
           <div className="relative flex-1 group">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-[#006600]" />
             <Input 
               placeholder="Search by name, ID, or program" 
-              className="pl-10 h-11 bg-white border-slate-200 rounded-xl"
+              className="pl-10 h-11 bg-white border-slate-200 rounded-xl shadow-sm focus-visible:ring-[#006600]"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button variant="outline" className="h-11 w-11 rounded-xl border-slate-200 p-0 text-[#006600]">
+          <Button variant="outline" className="h-11 w-11 rounded-xl border-slate-200 p-0 text-[#006600] shadow-sm">
             <Filter className="h-5 w-5" />
           </Button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-6 border-b border-slate-200 px-2">
+        <div className="flex gap-6 border-b border-slate-200 px-2 overflow-x-auto scrollbar-hide">
           {["all", "active", "blocked"].map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f as any)}
-              className={`pb-2 text-xs font-bold uppercase tracking-widest transition-all ${
+              className={`pb-2 text-xs font-bold uppercase tracking-widest transition-all whitespace-nowrap ${
                 filter === f 
                   ? 'text-[#006600] border-b-2 border-[#006600]' 
                   : 'text-slate-400'
@@ -125,10 +145,9 @@ export default function UsersManagement() {
           ))}
         </div>
 
-        {/* User Cards */}
         <div className="space-y-4">
           {filteredUsers.map((user) => (
-            <Card key={user.uid} className="rounded-2xl border-none shadow-md overflow-hidden bg-white">
+            <Card key={user.uid} className="rounded-2xl border-none shadow-md overflow-hidden bg-white transition-transform active:scale-[0.98]">
               <CardContent className="p-4 flex items-center gap-4">
                 <Avatar className={`h-16 w-16 rounded-xl border-2 ${user.isBlocked ? 'grayscale opacity-50' : 'border-[#006600]/10'}`}>
                   <AvatarImage src={user.photoURL} className="object-cover" />
@@ -137,11 +156,11 @@ export default function UsersManagement() {
                 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <p className="font-bold text-sm truncate">{user.displayName}</p>
-                    {user.isBlocked && <Badge variant="destructive" className="text-[8px] h-4 px-1 leading-none uppercase">Blocked</Badge>}
+                    <p className="font-bold text-sm text-slate-800 truncate">{user.displayName}</p>
+                    {user.isBlocked && <Badge variant="destructive" className="text-[8px] h-4 px-1 leading-none uppercase font-bold">Blocked</Badge>}
                   </div>
                   <p className="text-[10px] text-[#006600] font-bold uppercase tracking-tight truncate">
-                    #ID: {user.studentId || 'XXXXX'} • {user.program || 'GENERAL'}
+                    #ID: {user.studentId || 'NOT SET'} • {user.program || 'GENERAL'}
                   </p>
                   
                   <div className="flex items-center justify-between mt-3">
@@ -159,7 +178,7 @@ export default function UsersManagement() {
             </Card>
           ))}
           
-          {filteredUsers.length === 0 && !loading && (
+          {filteredUsers.length === 0 && (
             <div className="p-12 text-center text-muted-foreground text-sm italic">
               No users found matching your filters.
             </div>
