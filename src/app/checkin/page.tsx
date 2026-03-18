@@ -25,7 +25,10 @@ export default function QuickCheckIn() {
 
   useEffect(() => {
     const stored = sessionStorage.getItem("quickVisitUser");
-    if (!stored) { router.replace("/"); return; }
+    if (!stored) { 
+      router.replace("/"); 
+      return; 
+    }
     setUserData(JSON.parse(stored));
   }, [router]);
 
@@ -63,6 +66,9 @@ export default function QuickCheckIn() {
 
   if (!userData && !showSuccess) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-[#006600]" /></div>;
 
+  const displayName = userData?.displayName || "Visitor";
+  const programName = userData?.program || "";
+
   return (
     <div className="flex flex-col min-h-screen bg-[#f5f8f5] items-center justify-center md:p-8">
       {showSuccess && (
@@ -92,12 +98,12 @@ export default function QuickCheckIn() {
 
           {/* User name */}
           <p className="text-green-200 text-lg text-center">
-            Thank you, {userData?.displayName}!
+            Thank you, {displayName}!
           </p>
 
           {/* Program */}
           <p className="text-green-300 text-sm text-center mt-1">
-            {userData?.program}
+            {programName}
           </p>
 
           {/* Divider */}
@@ -140,11 +146,11 @@ export default function QuickCheckIn() {
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => router.push('/')} className="h-9 w-9"><ArrowLeft className="h-5 w-5" /></Button>
             <div>
-              <h1 className="font-bold text-base md:text-xl text-slate-800">Hi, {userData?.displayName?.split(' ')[0]}!</h1>
-              <p className="text-[10px] md:text-xs font-bold text-[#006600] uppercase">QUICK ENTRY • {userData?.program?.toUpperCase()}</p>
+              <h1 className="font-bold text-base md:text-xl text-slate-800">Hi, {displayName.split(' ')[0]}!</h1>
+              <p className="text-[10px] md:text-xs font-bold text-[#006600] uppercase">QUICK ENTRY • {programName.toUpperCase() || 'USER'}</p>
             </div>
           </div>
-          <div className="h-10 w-10 md:h-12 md:w-12 bg-[#006600] rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md">{userData?.displayName?.charAt(0)}</div>
+          <div className="h-10 w-10 md:h-12 md:w-12 bg-[#006600] rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md">{displayName.charAt(0)}</div>
         </header>
 
         <div className="p-4 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-8">

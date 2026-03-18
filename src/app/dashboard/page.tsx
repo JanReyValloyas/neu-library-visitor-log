@@ -14,7 +14,7 @@ import { ArrowLeft, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import Image from "next/image";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
-import { useRouter } from "navigation";
+import { useRouter } from "next/navigation";
 
 const reasons = ["Reading", "Researching", "Use of Computer", "Group Study", "Meeting", "Borrowing Books", "Other"];
 
@@ -64,6 +64,9 @@ export default function Dashboard() {
 
   if (loading || (!user && !showSuccess)) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-[#006600]" /></div>;
 
+  const displayName = user?.displayName || "Visitor";
+  const programName = profile?.program || "";
+
   return (
     <div className="flex flex-col min-h-screen bg-[#f5f8f5] items-center justify-center md:p-8">
       {showSuccess && (
@@ -93,12 +96,12 @@ export default function Dashboard() {
 
           {/* User name */}
           <p className="text-green-200 text-lg text-center">
-            Thank you, {user?.displayName}!
+            Thank you, {displayName}!
           </p>
 
           {/* Program */}
           <p className="text-green-300 text-sm text-center mt-1">
-            {profile?.program}
+            {programName}
           </p>
 
           {/* Divider */}
@@ -141,11 +144,11 @@ export default function Dashboard() {
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => router.push('/')} className="h-9 w-9"><ArrowLeft className="h-5 w-5" /></Button>
             <div>
-              <h1 className="font-bold text-base md:text-xl text-slate-800">Hi, {user?.displayName?.split(' ')[0]}!</h1>
-              <p className="text-[10px] md:text-xs font-bold text-[#006600] uppercase">{profile?.program || 'User'}</p>
+              <h1 className="font-bold text-base md:text-xl text-slate-800">Hi, {displayName.split(' ')[0]}!</h1>
+              <p className="text-[10px] md:text-xs font-bold text-[#006600] uppercase">{programName || 'User'}</p>
             </div>
           </div>
-          <Avatar className="h-10 w-10 md:h-12 md:w-12 border-2 border-[#D4AF37]"><AvatarImage src={user?.photoURL || ""} /><AvatarFallback>{user?.displayName?.charAt(0)}</AvatarFallback></Avatar>
+          <Avatar className="h-10 w-10 md:h-12 md:w-12 border-2 border-[#D4AF37]"><AvatarImage src={user?.photoURL || ""} /><AvatarFallback>{displayName.charAt(0)}</AvatarFallback></Avatar>
         </header>
 
         <div className="p-4 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
