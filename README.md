@@ -30,7 +30,7 @@ visitor logs at New Era University (NEU).
 ## 🚀 Setup Instructions
 
 1. Clone the repository
-git clone https://github.com/JanReyValloyas/studio.git
+git clone  https://github.com/JanReyValloyas/neu-library-visitor-log
 
 2. Install dependencies
 npm install
