@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/hooks/useAuth";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { auth, db } from "@/firebase/index";
 import { signOut, updateProfile } from "firebase/auth";
@@ -29,26 +29,26 @@ import {
   ChevronUp, 
   Settings2,
   CheckCircle2,
-  AlertCircle
+  LayoutDashboard,
+  Users,
+  BarChart,
+  Settings
 } from "lucide-react";
 import { BottomNav } from "@/components/admin/bottom-nav";
 import { toast } from "@/hooks/use-toast";
+import Link from "next/link";
 
 export default function AdminSettings() {
   const { user, role, loading: authLoading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   
-  // Auth & Profile State
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [isSavingAccount, setIsSavingAccount] = useState(false);
-
-  // Library Info State
   const [libraryName, setLibraryName] = useState("NEU Main Library");
   const [libraryHours, setLibraryHours] = useState("7:00 AM - 9:00 PM");
   const [isSavingLibrary, setIsSavingLibrary] = useState(false);
-
-  // Advanced Settings State
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [maxVisitors, setMaxVisitors] = useState(500);
   const [requireStudentId, setRequireStudentId] = useState(false);
@@ -66,7 +66,6 @@ export default function AdminSettings() {
     }
   }, [user, role, authLoading, router]);
 
-  // Load existing settings from Firestore on mount
   useEffect(() => {
     const loadSettings = async () => {
       try {
@@ -105,14 +104,9 @@ export default function AdminSettings() {
     if (!user || !db) return;
     setIsSavingAccount(true);
     try {
-      // Update Auth Profile
       await updateProfile(user, { displayName });
-      // Update User Doc
       const userRef = doc(db, "users", user.uid);
-      await updateDoc(userRef, { 
-        displayName,
-        updatedAt: serverTimestamp() 
-      });
+      await updateDoc(userRef, { displayName, updatedAt: serverTimestamp() });
       toast({ title: "Account updated successfully" });
     } catch (error) {
       console.error("Save account error:", error);
@@ -154,7 +148,6 @@ export default function AdminSettings() {
         updatedAt: serverTimestamp(),
         updatedBy: user.email,
       }, { merge: true });
-      
       setAdvancedSaved(true);
       toast({ title: "Advanced settings saved!" });
       setTimeout(() => setAdvancedSaved(false), 3000);
@@ -174,238 +167,102 @@ export default function AdminSettings() {
     );
   }
 
+  const navItems = [
+    { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
+    { name: "Users", href: "/admin/users", icon: Users },
+    { name: "Analytics", href: "/admin/analytics", icon: BarChart },
+    { name: "Settings", href: "/admin/settings", icon: Settings },
+  ];
+
   return (
-    <div className="flex flex-col min-h-screen pb-24 bg-[#f5f8f5]">
-      <header className="p-6 bg-white border-b sticky top-0 z-10">
-        <h1 className="font-bold text-lg text-slate-800">Settings</h1>
-        <p className="text-[10px] font-bold text-[#D4AF37] uppercase tracking-widest">ADMINISTRATION PANEL</p>
-      </header>
+    <div className="flex flex-col min-h-screen bg-[#f5f8f5]">
+      {/* Desktop Sidebar */}
+      <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 bg-white border-r border-primary/10 pt-6 z-20">
+        <div className="px-6 mb-8 flex items-center gap-3">
+          <div className="w-10 h-10 bg-[#006600] rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-md">NEU</div>
+          <div><h1 className="font-bold text-sm text-slate-800">NEU Library</h1><p className="text-[10px] font-bold text-[#D4AF37] uppercase">Admin Panel</p></div>
+        </div>
+        <nav className="flex-1 px-4 space-y-1">
+          {navItems.map((item) => (
+            <Link key={item.name} href={item.href} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-xs uppercase ${pathname === item.href ? 'bg-[#006600] text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}><item.icon className="h-4 w-4" />{item.name}</Link>
+          ))}
+        </nav>
+      </aside>
 
-      <main className="p-4 space-y-6 animate-in fade-in duration-500">
-        {/* Profile Card */}
-        <Card className="rounded-2xl border-none shadow-md overflow-hidden bg-white">
-          <CardContent className="p-6 flex items-center gap-4 bg-gradient-to-br from-[#006600] to-[#004d00] text-white">
-            <Avatar className="h-16 w-16 border-2 border-[#D4AF37] shadow-lg">
-              <AvatarImage src={user?.photoURL || ""} />
-              <AvatarFallback className="bg-[#D4AF37] text-white font-bold">{user?.displayName?.charAt(0)}</AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <h2 className="font-bold text-lg truncate">{user?.displayName}</h2>
-              <p className="text-[10px] text-[#D4AF37] font-bold uppercase tracking-widest">AUTHORIZED ADMINISTRATOR</p>
-              <div className="flex items-center gap-1 mt-1 opacity-80">
-                <ShieldCheck className="h-3 w-3" />
-                <span className="text-[10px] font-medium truncate">{user?.email}</span>
+      <div className="flex flex-col flex-1 md:ml-64 pb-20 md:pb-8">
+        <header className="p-4 md:p-6 bg-white border-b sticky top-0 z-10">
+          <h1 className="font-bold text-lg text-slate-800">Portal Settings</h1>
+          <p className="text-[10px] font-bold text-[#D4AF37] uppercase tracking-widest">Administration</p>
+        </header>
+
+        <main className="p-4 md:p-6 lg:p-8 space-y-6">
+          <Card className="rounded-2xl border-none shadow-md overflow-hidden bg-white">
+            <CardContent className="p-6 md:p-10 flex flex-col md:flex-row items-center gap-6 bg-gradient-to-br from-[#006600] to-[#004d00] text-white">
+              <Avatar className="h-20 w-20 md:h-24 md:w-24 border-4 border-[#D4AF37] shadow-xl">
+                <AvatarImage src={user?.photoURL || ""} />
+                <AvatarFallback className="bg-[#D4AF37] text-white font-bold text-2xl">{user?.displayName?.charAt(0)}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1 text-center md:text-left">
+                <h2 className="font-bold text-2xl md:text-3xl">{user?.displayName}</h2>
+                <p className="text-xs text-[#D4AF37] font-bold uppercase tracking-widest mt-1">Authorized Administrator</p>
+                <div className="flex items-center justify-center md:justify-start gap-2 mt-3 opacity-90"><ShieldCheck className="h-4 w-4" /><span className="text-sm">{user?.email}</span></div>
               </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest px-1">Account Management</h3>
+              <Card className="rounded-2xl border-none shadow-md bg-white p-5 space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold uppercase text-slate-400">Display Name</Label>
+                  <div className="relative group"><UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-[#006600]" /><Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="pl-10 h-12 rounded-xl" /></div>
+                </div>
+                <div className="space-y-2"><Label className="text-[10px] font-bold uppercase text-slate-400">Email Address (Read-only)</Label><Input value={user?.email || ""} disabled className="h-12 bg-slate-50 rounded-xl opacity-70" /></div>
+                <Button onClick={handleSaveAccount} className="w-full bg-[#006600] h-12 rounded-xl font-bold uppercase text-xs gap-2" disabled={isSavingAccount}>{isSavingAccount ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save Profile</Button>
+              </Card>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Account Management */}
-        <div className="space-y-4">
-          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest px-1">Account Management</h3>
-          <Card className="rounded-2xl border-none shadow-md bg-white overflow-hidden">
-            <CardContent className="p-5 space-y-4">
-              <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Display Name</Label>
-                <div className="relative group">
-                  <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-[#006600]" />
-                  <Input 
-                    value={displayName} 
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    className="pl-10 h-11 border-slate-200 rounded-xl focus-visible:ring-[#006600]"
-                  />
+            <div className="space-y-4">
+              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest px-1">Library Configuration</h3>
+              <Card className="rounded-2xl border-none shadow-md bg-white p-5 space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold uppercase text-slate-400">System Name</Label>
+                  <div className="relative"><Library className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" /><Input value={libraryName} onChange={(e) => setLibraryName(e.target.value)} className="pl-10 h-12 rounded-xl" /></div>
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Email Address (Read-only)</Label>
-                <Input 
-                  value={user?.email || ""} 
-                  disabled
-                  className="h-11 border-slate-200 bg-slate-50 rounded-xl opacity-70"
-                />
-              </div>
-              <Button 
-                onClick={handleSaveAccount} 
-                className="w-full bg-[#006600] hover:bg-[#004d00] h-11 rounded-xl font-bold uppercase tracking-wider text-xs gap-2"
-                disabled={isSavingAccount}
-              >
-                {isSavingAccount ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Save Account Changes
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Library Configuration */}
-        <div className="space-y-4">
-          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest px-1">Library Configuration</h3>
-          <Card className="rounded-2xl border-none shadow-md bg-white overflow-hidden">
-            <CardContent className="p-5 space-y-4">
-              <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Library System Name</Label>
-                <div className="relative">
-                  <Library className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <Input 
-                    value={libraryName} 
-                    onChange={(e) => setLibraryName(e.target.value)}
-                    className="pl-10 h-11 border-slate-200 rounded-xl focus-visible:ring-[#006600]"
-                  />
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold uppercase text-slate-400">Operating Hours</Label>
+                  <div className="relative"><Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" /><Input value={libraryHours} onChange={(e) => setLibraryHours(e.target.value)} className="pl-10 h-12 rounded-xl" /></div>
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Operational Hours</Label>
-                <div className="relative">
-                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <Input 
-                    value={libraryHours} 
-                    onChange={(e) => setLibraryHours(e.target.value)}
-                    className="pl-10 h-11 border-slate-200 rounded-xl focus-visible:ring-[#006600]"
-                  />
+                <Button onClick={handleSaveLibrary} className="w-full bg-[#006600] h-12 rounded-xl font-bold uppercase text-xs gap-2" disabled={isSavingLibrary}>{isSavingLibrary ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save Library Info</Button>
+              </Card>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest px-1">Advanced Controls</h3>
+            <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex items-center justify-between p-4 border border-slate-200 rounded-xl bg-white hover:border-[#006600] transition">
+              <div className="flex items-center gap-2"><Settings2 className="h-5 w-5 text-[#006600]" /><span className="font-bold text-xs uppercase text-slate-700">Advanced System Settings</span></div>
+              {showAdvanced ? <ChevronUp className="h-5 w-5 text-slate-400" /> : <ChevronDown className="h-5 w-5 text-slate-400" />}
+            </button>
+            {showAdvanced && (
+              <Card className="rounded-2xl border-none shadow-md bg-white p-6 md:p-10 space-y-6 animate-in slide-in-from-top-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-500 uppercase">Max Daily Visitors</label><Input type="number" value={maxVisitors} onChange={(e) => setMaxVisitors(Number(e.target.value))} className="h-12 rounded-xl" /></div>
+                  <div className="space-y-1.5"><label className="text-[10px] font-bold text-slate-500 uppercase">Allowed Domain</label><Input value={allowedDomain} onChange={(e) => setAllowedDomain(e.target.value)} className="h-12 rounded-xl" /></div>
                 </div>
-              </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="flex items-center justify-between p-4 border rounded-xl bg-slate-50"><span className="text-xs font-bold text-slate-600 uppercase">Require Student ID</span><Switch checked={requireStudentId} onCheckedChange={setRequireStudentId} /></div>
+                  <div className="flex items-center justify-between p-4 border rounded-xl bg-slate-50"><span className="text-xs font-bold text-slate-600 uppercase">Auto Sign-out</span><Switch checked={autoSignOut} onCheckedChange={setAutoSignOut} /></div>
+                </div>
+                <Button onClick={handleSaveAdvanced} disabled={savingAdvanced} className="w-full bg-[#006600] h-14 rounded-xl font-bold uppercase text-sm gap-2">{savingAdvanced ? <Loader2 className="h-5 w-5 animate-spin" /> : advancedSaved ? <CheckCircle2 className="h-5 w-5" /> : <Save className="h-5 w-5" />} Save Global Configuration</Button>
+              </Card>
+            )}
+          </div>
 
-              <Button 
-                onClick={handleSaveLibrary} 
-                className="w-full bg-[#006600] hover:bg-[#004d00] h-11 rounded-xl font-bold uppercase tracking-wider text-xs gap-2"
-                disabled={isSavingLibrary}
-              >
-                {isSavingLibrary ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Save Library Info
-              </Button>
-              
-              <div className="space-y-2 pt-2">
-                <button
-                  onClick={() => setShowAdvanced(!showAdvanced)}
-                  className="w-full flex items-center justify-between p-4 border border-slate-200 rounded-xl hover:border-[#006600] transition group bg-white"
-                >
-                  <div className="flex items-center gap-2">
-                    <Settings2 className="h-5 w-5 text-[#006600]" />
-                    <span className="font-bold text-xs uppercase tracking-wider text-slate-700">
-                      Advanced Settings
-                    </span>
-                  </div>
-                  {showAdvanced ? (
-                    <ChevronUp className="h-5 w-5 text-slate-400 group-hover:text-[#006600]" />
-                  ) : (
-                    <ChevronDown className="h-5 w-5 text-slate-400 group-hover:text-[#006600]" />
-                  )}
-                </button>
-
-                {showAdvanced && (
-                  <div className="border border-slate-200 rounded-xl p-4 space-y-5 mt-2 bg-slate-50/30 animate-in slide-in-from-top-2 duration-200">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                        Max Visitors Per Day
-                      </label>
-                      <Input 
-                        type="number"
-                        value={maxVisitors}
-                        onChange={(e) => setMaxVisitors(Number(e.target.value))}
-                        className="h-11 border-slate-200 rounded-xl focus-visible:ring-[#006600] bg-white"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">
-                        Require Student ID for Check-in
-                      </label>
-                      <div className="flex items-center gap-3">
-                        <label className="relative flex h-6 w-11 cursor-pointer items-center rounded-full bg-slate-200 p-0.5 transition-colors has-[:checked]:bg-[#006600]">
-                          <input 
-                            type="checkbox" 
-                            className="peer invisible absolute" 
-                            checked={requireStudentId}
-                            onChange={(e) => setRequireStudentId(e.target.checked)}
-                          />
-                          <div className="h-5 w-5 rounded-full bg-white shadow-md transform transition-transform duration-200 peer-checked:translate-x-5"></div>
-                        </label>
-                        <span className="text-xs font-bold text-slate-600 uppercase tracking-tight">
-                          {requireStudentId ? 'Enabled' : 'Disabled'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">
-                        Auto Sign-out After Check-in
-                      </label>
-                      <div className="flex items-center gap-3">
-                        <label className="relative flex h-6 w-11 cursor-pointer items-center rounded-full bg-slate-200 p-0.5 transition-colors has-[:checked]:bg-[#006600]">
-                          <input 
-                            type="checkbox" 
-                            className="peer invisible absolute"
-                            checked={autoSignOut}
-                            onChange={(e) => setAutoSignOut(e.target.checked)}
-                          />
-                          <div className="h-5 w-5 rounded-full bg-white shadow-md transform transition-transform duration-200 peer-checked:translate-x-5"></div>
-                        </label>
-                        <span className="text-xs font-bold text-slate-600 uppercase tracking-tight">
-                          {autoSignOut ? 'Enabled' : 'Disabled'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                        Allowed Email Domain
-                      </label>
-                      <Input 
-                        type="text"
-                        value={allowedDomain}
-                        onChange={(e) => setAllowedDomain(e.target.value)}
-                        className="h-11 border-slate-200 rounded-xl focus-visible:ring-[#006600] bg-white"
-                      />
-                    </div>
-
-                    <Button 
-                      onClick={handleSaveAdvanced}
-                      disabled={savingAdvanced}
-                      className="w-full bg-[#006600] hover:bg-green-800 text-white h-12 rounded-xl font-bold text-xs uppercase tracking-widest transition shadow-md gap-2"
-                    >
-                      {savingAdvanced ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Saving...
-                        </>
-                      ) : advancedSaved ? (
-                        <>
-                          <CheckCircle2 className="h-4 w-4" />
-                          Settings Saved!
-                        </>
-                      ) : (
-                        <>
-                          <Save className="h-4 w-4" />
-                          Save Advanced Settings
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Danger Zone */}
-        <div className="space-y-4 pb-4">
-          <h3 className="text-xs font-bold text-red-500 uppercase tracking-widest px-1">Danger Zone</h3>
-          <Card className="rounded-2xl border-2 border-red-50 shadow-sm bg-white overflow-hidden">
-            <CardContent className="p-5">
-              <Button 
-                variant="destructive" 
-                onClick={handleSignOut}
-                disabled={isLoggingOut}
-                className="w-full h-11 rounded-xl font-bold uppercase tracking-wider text-xs gap-2 shadow-lg"
-              >
-                {isLoggingOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
-                Sign Out from Portal
-              </Button>
-              <p className="text-[9px] text-center text-slate-400 mt-3 font-medium uppercase tracking-widest">Session ID: {user?.uid.slice(0, 12)}...</p>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
-
+          <Card className="rounded-2xl border-2 border-red-50 shadow-sm bg-white p-5"><Button variant="destructive" onClick={handleSignOut} disabled={isLoggingOut} className="w-full h-12 rounded-xl font-bold uppercase text-xs gap-2">{isLoggingOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />} Sign Out from Admin Portal</Button></Card>
+        </main>
+      </div>
       <BottomNav />
     </div>
   );

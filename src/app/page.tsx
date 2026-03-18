@@ -1,4 +1,3 @@
-
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -18,17 +17,16 @@ export default function LoginPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (loading) return; // Wait for auth + firestore
-    if (!user) return;   // Not logged in, stay on page
+    if (loading) return;
+    if (!user) return;
     
     if (profileComplete === false) {
       router.replace("/complete-profile");
     } else if (role === "admin") {
-      router.replace("/admin");  // Admin goes to /admin
+      router.replace("/admin");
     } else if (role === "user") {
-      router.replace("/dashboard"); // User goes to /dashboard
+      router.replace("/dashboard");
     }
-    // If role is null, keep waiting
   }, [user, role, profileComplete, loading, router]);
 
   const handleIdLogin = async (e: React.FormEvent) => {
@@ -112,20 +110,30 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#f5f8f5] p-4">
-      <div className="w-full max-w-md bg-white shadow-2xl rounded-xl overflow-hidden">
-        <div className="bg-[#006600] p-8 flex flex-col items-center gap-4">
-          <div className="bg-white rounded-xl p-3">
-            <img src="/neu-seal.png" alt="NEU Seal" className="w-20 h-20 object-contain" />
-          </div>
-          <h1 className="text-white text-2xl font-bold uppercase tracking-tight">NEU Library</h1>
-          <div className="w-16 h-1 bg-[#D4AF37] rounded"></div>
+    <div className="min-h-screen flex items-center justify-center bg-[#f5f8f5] p-4 lg:p-8">
+      <div className="w-full max-w-md md:max-w-4xl bg-white shadow-2xl rounded-2xl overflow-hidden md:flex">
+        {/* Left panel - desktop only */}
+        <div className="hidden md:flex md:w-1/2 bg-[#006600] flex-col items-center justify-center p-12 text-white">
+          <img src="/neu-seal.png" alt="NEU Seal" className="w-32 h-32 object-contain mb-6" />
+          <h1 className="text-3xl font-bold text-center uppercase tracking-tight">NEU Library</h1>
+          <div className="w-16 h-1 bg-[#D4AF37] my-6 rounded"></div>
+          <p className="text-green-100 text-center text-sm md:text-base font-medium">Empowering Research & Learning</p>
+          <p className="text-green-300 text-center text-xs mt-12 opacity-70">New Era University<br />Library Management System</p>
         </div>
-        <div className="p-6 space-y-6">
+
+        {/* Right panel - login form */}
+        <div className="w-full md:w-1/2 bg-white p-6 md:p-10 space-y-8">
+          <div className="md:hidden flex flex-col items-center mb-4">
+             <div className="bg-[#006600] p-4 rounded-xl mb-4">
+                <img src="/neu-seal.png" alt="NEU Seal" className="w-16 h-16 object-contain" />
+             </div>
+          </div>
+          
           <div>
-            <h2 className="text-xl font-bold text-slate-800">Library Visitor Log</h2>
+            <h2 className="text-xl md:text-2xl font-bold text-slate-800">Library Visitor Log</h2>
             <p className="text-slate-500 text-sm mt-1">Welcome back, Eagle! Please record your visit.</p>
           </div>
+
           <form onSubmit={handleIdLogin} className="space-y-4">
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-[#006600] uppercase tracking-widest">
@@ -138,7 +146,7 @@ export default function LoginPage() {
                   placeholder="RFID or Student ID Number"
                   value={studentIdInput}
                   onChange={(e) => setStudentIdInput(e.target.value)}
-                  className="w-full border-2 border-slate-100 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-[#006600] transition-colors"
+                  className="w-full border-2 border-slate-100 rounded-xl pl-10 pr-4 py-3.5 text-sm focus:outline-none focus:border-[#006600] transition-colors"
                 />
               </div>
               <button 
@@ -177,12 +185,11 @@ export default function LoginPage() {
             {signingIn ? "Signing in..." : "Sign in with Google"}
           </button>
           
-          <p className="text-[10px] text-center text-gray-400 uppercase tracking-widest">
-            Restricted to <span className="text-[#006600] font-bold">@neu.edu.ph</span> accounts
-          </p>
-        </div>
-        <div className="bg-[#f5f8f5] p-5 text-center border-t border-slate-100">
-          <p className="text-[10px] text-slate-400 uppercase tracking-[0.2em] font-bold">🛡️ Secure Academic Portal © 2024 NEU</p>
+          <div className="pt-4 text-center">
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest">
+              Restricted to <span className="text-[#006600] font-bold">@neu.edu.ph</span> accounts
+            </p>
+          </div>
         </div>
       </div>
     </div>

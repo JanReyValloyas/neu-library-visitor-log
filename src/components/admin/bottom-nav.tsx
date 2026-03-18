@@ -16,7 +16,7 @@ export function BottomNav() {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[28rem] h-16 bg-white border-t flex items-center justify-around z-50">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white border-t flex items-center justify-around z-50">
       {tabs.map((tab) => {
         const isActive = pathname === tab.href;
         return (
@@ -24,7 +24,7 @@ export function BottomNav() {
             key={tab.name}
             href={tab.href}
             className={cn(
-              "flex flex-col items-center gap-1 transition-colors px-4 py-2",
+              "flex flex-col items-center gap-1 transition-colors px-4 py-2 relative",
               isActive ? "text-[#006600]" : "text-muted-foreground hover:text-[#006600]/70"
             )}
           >
