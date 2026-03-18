@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { db } from "@/firebase/index";
 import { 
@@ -10,7 +10,6 @@ import {
   getDocs,
   orderBy, 
   onSnapshot, 
-  limit, 
   Timestamp 
 } from "firebase/firestore";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,20 +20,15 @@ import {
   Bell, 
   Search, 
   Printer, 
-  Plus, 
   Clock, 
   Users, 
   TrendingUp, 
-  Calendar as CalendarIcon,
-  ChevronDown,
   Loader2,
-  X,
   CalendarDays
 } from "lucide-react";
 import { BottomNav } from "@/components/admin/bottom-nav";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface Visit {
@@ -236,7 +230,7 @@ export default function AdminDashboard() {
     
     const doc = new jsPDF();
     
-    doc.setFillColor(26, 35, 126); // Use Navy Blue from requirements
+    doc.setFillColor(0, 102, 0); // NEU Green
     doc.rect(0, 0, 210, 25, "F");
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(16);
@@ -265,11 +259,11 @@ export default function AdminDashboard() {
           }) || "N/A",
       ]),
       headStyles: { 
-        fillColor: [26, 35, 126],
+        fillColor: [0, 102, 0], // NEU Green
         textColor: [255, 255, 255],
         fontStyle: "bold"
       },
-      alternateRowStyles: { fillColor: [240, 244, 245] },
+      alternateRowStyles: { fillColor: [245, 248, 245] },
       styles: { fontSize: 8 },
     });
     
@@ -286,8 +280,8 @@ export default function AdminDashboard() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f0f4f5]">
-        <Loader2 className="h-10 w-10 animate-spin text-[#1a237e]" />
+      <div className="min-h-screen flex items-center justify-center bg-[#f5f8f5]">
+        <Loader2 className="h-10 w-10 animate-spin text-[#006600]" />
       </div>
     );
   }
@@ -304,15 +298,15 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen pb-20 bg-[#f0f4f5]">
+    <div className="flex flex-col min-h-screen pb-20 bg-[#f5f8f5]">
       <header className="p-6 flex items-center justify-between bg-white border-b sticky top-0 z-50">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-[#1a237e] rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-md">
+          <div className="w-10 h-10 bg-[#006600] rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-md">
             NEU
           </div>
           <div>
             <h1 className="font-bold text-sm tracking-tight text-slate-800">NEU Library</h1>
-            <p className="text-[10px] font-bold text-[#ffd700] uppercase tracking-widest">ADMIN DASHBOARD</p>
+            <p className="text-[10px] font-bold text-[#D4AF37] uppercase tracking-widest">ADMIN DASHBOARD</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -359,7 +353,7 @@ export default function AdminDashboard() {
             )}
           </div>
           
-          <Avatar className="h-9 w-9 border-2 border-[#ffd700]">
+          <Avatar className="h-9 w-9 border-2 border-[#D4AF37]">
             <AvatarFallback className="bg-slate-100 text-[10px] font-bold">{user.displayName?.charAt(0)}</AvatarFallback>
           </Avatar>
         </div>
@@ -369,20 +363,20 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-2 gap-3">
           <Card className="rounded-2xl border-none shadow-md overflow-hidden bg-white">
             <CardContent className="p-4 flex flex-col justify-between h-full">
-              <div className="h-8 w-8 bg-[#1a237e]/10 rounded-lg flex items-center justify-center mb-2">
-                <Users className="h-4 w-4 text-[#1a237e]" />
+              <div className="h-8 w-8 bg-[#006600]/10 rounded-lg flex items-center justify-center mb-2">
+                <Users className="h-4 w-4 text-[#006600]" />
               </div>
               <div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Today's Visits</p>
-                <p className="text-2xl font-bold text-[#1a237e]">{todayCount}</p>
+                <p className="text-2xl font-bold text-[#006600]">{todayCount}</p>
               </div>
             </CardContent>
           </Card>
 
           <Card className="rounded-2xl border-none shadow-md overflow-hidden bg-white">
             <CardContent className="p-4 flex flex-col justify-between h-full">
-              <div className="h-8 w-8 bg-blue-50 rounded-lg flex items-center justify-center mb-2">
-                <CalendarDays className="h-4 w-4 text-blue-600" />
+              <div className="h-8 w-8 bg-green-50 rounded-lg flex items-center justify-center mb-2">
+                <CalendarDays className="h-4 w-4 text-[#006600]" />
               </div>
               <div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">This Week</p>
@@ -433,7 +427,7 @@ export default function AdminDashboard() {
                   cursor={{ fill: '#f8fafc' }}
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '10px' }}
                 />
-                <Bar dataKey="count" fill="#1a237e" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="count" fill="#006600" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </Card>
@@ -446,7 +440,7 @@ export default function AdminDashboard() {
                 key={f}
                 onClick={() => handleFilterChange(f)}
                 className={activeFilter === f 
-                  ? "bg-[#1a237e] text-white px-5 py-2 rounded-full text-[10px] font-bold shadow-md transition-all uppercase tracking-wider"
+                  ? "bg-[#006600] text-white px-5 py-2 rounded-full text-[10px] font-bold shadow-md transition-all uppercase tracking-wider"
                   : "bg-white border border-slate-200 text-slate-500 px-5 py-2 rounded-full text-[10px] font-bold hover:bg-slate-50 transition-all uppercase tracking-wider"}
               >
                 {f}
@@ -456,17 +450,17 @@ export default function AdminDashboard() {
 
           <div className="space-y-3">
             <div className="relative group">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-[#1a237e] transition-colors" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-[#006600] transition-colors" />
               <Input 
                 placeholder="Search visitor logs..." 
-                className="pl-10 h-12 bg-white border-slate-200 rounded-xl focus-visible:ring-[#1a237e] shadow-sm"
+                className="pl-10 h-12 bg-white border-slate-200 rounded-xl focus-visible:ring-[#006600] shadow-sm"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
             <Button 
               onClick={handleExportPDF}
-              className="w-full h-12 bg-[#ffd700] hover:bg-[#e6c200] text-[#1a237e] font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 uppercase tracking-wider text-xs"
+              className="w-full h-12 bg-[#D4AF37] hover:bg-[#c5a02d] text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 uppercase tracking-wider text-xs"
             >
               <Printer className="h-4 w-4" />
               Generate PDF Report
@@ -486,16 +480,16 @@ export default function AdminDashboard() {
           <div className="divide-y divide-slate-100">
             {loading ? (
               <div className="p-12 flex justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-[#1a237e]" />
+                <Loader2 className="h-6 w-6 animate-spin text-[#006600]" />
               </div>
             ) : searchFilteredResults.map((visit) => (
               <div key={visit.id} className="p-4 flex items-center gap-3 hover:bg-slate-50 transition-colors group">
-                <div className="h-10 w-10 bg-[#1a237e]/5 rounded-xl flex items-center justify-center text-[#1a237e] font-bold text-xs shrink-0 group-hover:bg-[#1a237e] group-hover:text-white transition-all duration-300">
+                <div className="h-10 w-10 bg-[#006600]/5 rounded-xl flex items-center justify-center text-[#006600] font-bold text-xs shrink-0 group-hover:bg-[#006600] group-hover:text-white transition-all duration-300">
                   {getInitials(visit.displayName)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-sm text-slate-800 truncate">{visit.displayName || "Unknown User"}</p>
-                  <p className="text-[10px] text-[#1a237e] font-bold uppercase truncate tracking-tight">{visit.program || "GENERAL"}</p>
+                  <p className="text-[10px] text-[#006600] font-bold uppercase truncate tracking-tight">{visit.program || "GENERAL"}</p>
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0">
                   <Badge variant="outline" className="text-[9px] font-bold text-slate-500 border-slate-200 rounded-lg uppercase bg-slate-50">
