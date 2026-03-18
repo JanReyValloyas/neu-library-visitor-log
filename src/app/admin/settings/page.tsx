@@ -5,16 +5,31 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { auth, db } from "@/firebase/index";
 import { signOut, updateProfile } from "firebase/auth";
-import { doc, updateDoc } from "firebase/firestore";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { 
+  doc, 
+  getDoc, 
+  setDoc, 
+  updateDoc, 
+  serverTimestamp 
+} from "firebase/firestore";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
-  LogOut, User as UserIcon, Settings as SettingsIcon, 
-  Library, Clock, ShieldCheck, ChevronRight, Loader2, Save,
-  ChevronDown, ChevronUp, Settings2
+  LogOut, 
+  User as UserIcon, 
+  Library, 
+  Clock, 
+  ShieldCheck, 
+  Loader2, 
+  Save,
+  ChevronDown, 
+  ChevronUp, 
+  Settings2,
+  CheckCircle2,
+  AlertCircle
 } from "lucide-react";
 import { BottomNav } from "@/components/admin/bottom-nav";
 import { toast } from "@/hooks/use-toast";
@@ -22,12 +37,25 @@ import { toast } from "@/hooks/use-toast";
 export default function AdminSettings() {
   const { user, role, loading: authLoading } = useAuth();
   const router = useRouter();
+  
+  // Auth & Profile State
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [displayName, setDisplayName] = useState("");
+  const [isSavingAccount, setIsSavingAccount] = useState(false);
+
+  // Library Info State
   const [libraryName, setLibraryName] = useState("NEU Main Library");
   const [libraryHours, setLibraryHours] = useState("7:00 AM - 9:00 PM");
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSavingLibrary, setIsSavingLibrary] = useState(false);
+
+  // Advanced Settings State
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [maxVisitors, setMaxVisitors] = useState(500);
+  const [requireStudentId, setRequireStudentId] = useState(false);
+  const [autoSignOut, setAutoSignOut] = useState(true);
+  const [allowedDomain, setAllowedDomain] = useState("neu.edu.ph");
+  const [savingAdvanced, setSavingAdvanced] = useState(false);
+  const [advancedSaved, setAdvancedSaved] = useState(false);
 
   useEffect(() => {
     if (!authLoading && (!user || role !== 'admin')) {
@@ -37,6 +65,28 @@ export default function AdminSettings() {
       setDisplayName(user.displayName || "");
     }
   }, [user, role, authLoading, router]);
+
+  // Load existing settings from Firestore on mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const settingsRef = doc(db, "settings", "library");
+        const snap = await getDoc(settingsRef);
+        if (snap.exists()) {
+          const data = snap.data();
+          setMaxVisitors(data.maxVisitors ?? 500);
+          setRequireStudentId(data.requireStudentId ?? false);
+          setAutoSignOut(data.autoSignOut ?? true);
+          setAllowedDomain(data.allowedDomain ?? "neu.edu.ph");
+          setLibraryName(data.libraryName ?? "NEU Main Library");
+          setLibraryHours(data.operationalHours ?? "7:00 AM - 9:00 PM");
+        }
+      } catch (error) {
+        console.error("Load settings error:", error);
+      }
+    };
+    loadSettings();
+  }, []);
 
   const handleSignOut = async () => {
     setIsLoggingOut(true);
@@ -51,17 +101,68 @@ export default function AdminSettings() {
     }
   };
 
-  const handleUpdateAccount = async () => {
+  const handleSaveAccount = async () => {
     if (!user || !db) return;
-    setIsSaving(true);
+    setIsSavingAccount(true);
     try {
+      // Update Auth Profile
       await updateProfile(user, { displayName });
-      await updateDoc(doc(db, "users", user.uid), { displayName });
-      toast({ title: "Profile updated successfully" });
+      // Update User Doc
+      const userRef = doc(db, "users", user.uid);
+      await updateDoc(userRef, { 
+        displayName,
+        updatedAt: serverTimestamp() 
+      });
+      toast({ title: "Account updated successfully" });
     } catch (error) {
+      console.error("Save account error:", error);
       toast({ title: "Update failed", variant: "destructive" });
     } finally {
-      setIsSaving(false);
+      setIsSavingAccount(false);
+    }
+  };
+
+  const handleSaveLibrary = async () => {
+    if (!db) return;
+    setIsSavingLibrary(true);
+    try {
+      const settingsRef = doc(db, "settings", "library");
+      await setDoc(settingsRef, {
+        libraryName,
+        operationalHours: libraryHours,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      toast({ title: "Library settings saved!" });
+    } catch (error) {
+      console.error("Save library error:", error);
+      toast({ title: "Failed to save library info", variant: "destructive" });
+    } finally {
+      setIsSavingLibrary(false);
+    }
+  };
+
+  const handleSaveAdvanced = async () => {
+    if (!db || !user) return;
+    setSavingAdvanced(true);
+    try {
+      const settingsRef = doc(db, "settings", "library");
+      await setDoc(settingsRef, {
+        maxVisitors,
+        requireStudentId,
+        autoSignOut,
+        allowedDomain,
+        updatedAt: serverTimestamp(),
+        updatedBy: user.email,
+      }, { merge: true });
+      
+      setAdvancedSaved(true);
+      toast({ title: "Advanced settings saved!" });
+      setTimeout(() => setAdvancedSaved(false), 3000);
+    } catch (error) {
+      console.error("Save advanced error:", error);
+      toast({ title: "Failed to save advanced settings", variant: "destructive" });
+    } finally {
+      setSavingAdvanced(false);
     }
   };
 
@@ -74,13 +175,14 @@ export default function AdminSettings() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen pb-20 bg-[#f5f8f5]">
+    <div className="flex flex-col min-h-screen pb-24 bg-[#f5f8f5]">
       <header className="p-6 bg-white border-b sticky top-0 z-10">
         <h1 className="font-bold text-lg text-slate-800">Settings</h1>
         <p className="text-[10px] font-bold text-[#D4AF37] uppercase tracking-widest">ADMINISTRATION PANEL</p>
       </header>
 
       <main className="p-4 space-y-6 animate-in fade-in duration-500">
+        {/* Profile Card */}
         <Card className="rounded-2xl border-none shadow-md overflow-hidden bg-white">
           <CardContent className="p-6 flex items-center gap-4 bg-gradient-to-br from-[#006600] to-[#004d00] text-white">
             <Avatar className="h-16 w-16 border-2 border-[#D4AF37] shadow-lg">
@@ -98,6 +200,7 @@ export default function AdminSettings() {
           </CardContent>
         </Card>
 
+        {/* Account Management */}
         <div className="space-y-4">
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest px-1">Account Management</h3>
           <Card className="rounded-2xl border-none shadow-md bg-white overflow-hidden">
@@ -122,17 +225,18 @@ export default function AdminSettings() {
                 />
               </div>
               <Button 
-                onClick={handleUpdateAccount} 
+                onClick={handleSaveAccount} 
                 className="w-full bg-[#006600] hover:bg-[#004d00] h-11 rounded-xl font-bold uppercase tracking-wider text-xs gap-2"
-                disabled={isSaving}
+                disabled={isSavingAccount}
               >
-                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                {isSavingAccount ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 Save Account Changes
               </Button>
             </CardContent>
           </Card>
         </div>
 
+        {/* Library Configuration */}
         <div className="space-y-4">
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest px-1">Library Configuration</h3>
           <Card className="rounded-2xl border-none shadow-md bg-white overflow-hidden">
@@ -144,7 +248,7 @@ export default function AdminSettings() {
                   <Input 
                     value={libraryName} 
                     onChange={(e) => setLibraryName(e.target.value)}
-                    className="pl-10 h-11 border-slate-200 rounded-xl"
+                    className="pl-10 h-11 border-slate-200 rounded-xl focus-visible:ring-[#006600]"
                   />
                 </div>
               </div>
@@ -155,10 +259,19 @@ export default function AdminSettings() {
                   <Input 
                     value={libraryHours} 
                     onChange={(e) => setLibraryHours(e.target.value)}
-                    className="pl-10 h-11 border-slate-200 rounded-xl"
+                    className="pl-10 h-11 border-slate-200 rounded-xl focus-visible:ring-[#006600]"
                   />
                 </div>
               </div>
+
+              <Button 
+                onClick={handleSaveLibrary} 
+                className="w-full bg-[#006600] hover:bg-[#004d00] h-11 rounded-xl font-bold uppercase tracking-wider text-xs gap-2"
+                disabled={isSavingLibrary}
+              >
+                {isSavingLibrary ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Save Library Info
+              </Button>
               
               <div className="space-y-2 pt-2">
                 <button
@@ -184,10 +297,11 @@ export default function AdminSettings() {
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                         Max Visitors Per Day
                       </label>
-                      <input 
+                      <Input 
                         type="number"
-                        defaultValue={500}
-                        className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#006600] text-sm font-medium bg-white"
+                        value={maxVisitors}
+                        onChange={(e) => setMaxVisitors(Number(e.target.value))}
+                        className="h-11 border-slate-200 rounded-xl focus-visible:ring-[#006600] bg-white"
                       />
                     </div>
 
@@ -197,10 +311,17 @@ export default function AdminSettings() {
                       </label>
                       <div className="flex items-center gap-3">
                         <label className="relative flex h-6 w-11 cursor-pointer items-center rounded-full bg-slate-200 p-0.5 transition-colors has-[:checked]:bg-[#006600]">
-                          <input type="checkbox" className="peer invisible absolute" defaultChecked />
+                          <input 
+                            type="checkbox" 
+                            className="peer invisible absolute" 
+                            checked={requireStudentId}
+                            onChange={(e) => setRequireStudentId(e.target.checked)}
+                          />
                           <div className="h-5 w-5 rounded-full bg-white shadow-md transform transition-transform duration-200 peer-checked:translate-x-5"></div>
                         </label>
-                        <span className="text-xs font-bold text-slate-600 uppercase tracking-tight">Enabled</span>
+                        <span className="text-xs font-bold text-slate-600 uppercase tracking-tight">
+                          {requireStudentId ? 'Enabled' : 'Disabled'}
+                        </span>
                       </div>
                     </div>
 
@@ -210,10 +331,17 @@ export default function AdminSettings() {
                       </label>
                       <div className="flex items-center gap-3">
                         <label className="relative flex h-6 w-11 cursor-pointer items-center rounded-full bg-slate-200 p-0.5 transition-colors has-[:checked]:bg-[#006600]">
-                          <input type="checkbox" defaultChecked className="peer invisible absolute"/>
+                          <input 
+                            type="checkbox" 
+                            className="peer invisible absolute"
+                            checked={autoSignOut}
+                            onChange={(e) => setAutoSignOut(e.target.checked)}
+                          />
                           <div className="h-5 w-5 rounded-full bg-white shadow-md transform transition-transform duration-200 peer-checked:translate-x-5"></div>
                         </label>
-                        <span className="text-xs font-bold text-slate-600 uppercase tracking-tight">Enabled</span>
+                        <span className="text-xs font-bold text-slate-600 uppercase tracking-tight">
+                          {autoSignOut ? 'Enabled' : 'Disabled'}
+                        </span>
                       </div>
                     </div>
 
@@ -221,16 +349,36 @@ export default function AdminSettings() {
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                         Allowed Email Domain
                       </label>
-                      <input 
+                      <Input 
                         type="text"
-                        defaultValue="neu.edu.ph"
-                        className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#006600] text-sm font-medium bg-white"
+                        value={allowedDomain}
+                        onChange={(e) => setAllowedDomain(e.target.value)}
+                        className="h-11 border-slate-200 rounded-xl focus-visible:ring-[#006600] bg-white"
                       />
                     </div>
 
-                    <button className="w-full bg-[#006600] text-white py-3 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-green-800 transition shadow-md mt-2">
-                      Save Advanced Settings
-                    </button>
+                    <Button 
+                      onClick={handleSaveAdvanced}
+                      disabled={savingAdvanced}
+                      className="w-full bg-[#006600] hover:bg-green-800 text-white h-12 rounded-xl font-bold text-xs uppercase tracking-widest transition shadow-md gap-2"
+                    >
+                      {savingAdvanced ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : advancedSaved ? (
+                        <>
+                          <CheckCircle2 className="h-4 w-4" />
+                          Settings Saved!
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4" />
+                          Save Advanced Settings
+                        </>
+                      )}
+                    </Button>
                   </div>
                 )}
               </div>
@@ -238,6 +386,7 @@ export default function AdminSettings() {
           </Card>
         </div>
 
+        {/* Danger Zone */}
         <div className="space-y-4 pb-4">
           <h3 className="text-xs font-bold text-red-500 uppercase tracking-widest px-1">Danger Zone</h3>
           <Card className="rounded-2xl border-2 border-red-50 shadow-sm bg-white overflow-hidden">
