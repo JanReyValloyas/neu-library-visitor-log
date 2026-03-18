@@ -6,6 +6,8 @@ import { db } from "@/firebase/index";
 import { 
   collection, 
   query, 
+  where,
+  getDocs,
   orderBy, 
   onSnapshot, 
   limit, 
@@ -37,55 +39,242 @@ interface Visit {
   id: string;
   displayName: string;
   program: string;
+  college: string;
   reason: string;
+  date: string;
   timestamp: Timestamp | null;
 }
 
 export default function AdminDashboard() {
   const { user, role, loading: authLoading } = useAuth();
   const [visits, setVisits] = useState<Visit[]>([]);
+  const [filteredVisits, setFilteredVisits] = useState<Visit[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
+  
+  // Stats state
+  const [todayCount, setTodayCount] = useState(0);
+  const [weekCount, setWeekCount] = useState(0);
+  const [monthCount, setMonthCount] = useState(0);
+  const [allTimeCount, setAllTimeCount] = useState(0);
+  const [currentlyInside, setCurrentlyInside] = useState(0);
+  const [peakHour, setPeakHour] = useState("Loading...");
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [activeFilter, setActiveFilter] = useState("Today");
+
+  const getTodayRange = () => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+  }
+
+  const getWeekRange = () => {
+    const now = new Date();
+    const day = now.getDay();
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+    const start = new Date(now.setDate(diff));
+    start.setHours(0, 0, 0, 0);
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+  }
+
+  const getMonthRange = () => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+  }
+
+  const fetchStats = async () => {
+    if (!db) return;
+    try {
+      const visitsRef = collection(db, "visits");
+      
+      // TODAY count
+      const { start: todayStart, end: todayEnd } = getTodayRange();
+      const todayQ = query(visitsRef,
+        where("timestamp", ">=", Timestamp.fromDate(todayStart)),
+        where("timestamp", "<=", Timestamp.fromDate(todayEnd))
+      );
+      const todaySnap = await getDocs(todayQ);
+      setTodayCount(todaySnap.size);
+      
+      // Initial view: Today
+      const initialVisits = todaySnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Visit));
+      setVisits(initialVisits);
+      setFilteredVisits(initialVisits);
+      setCurrentlyInside(todaySnap.size);
+      
+      // THIS WEEK count
+      const { start: weekStart, end: weekEnd } = getWeekRange();
+      const weekQ = query(visitsRef,
+        where("timestamp", ">=", Timestamp.fromDate(weekStart)),
+        where("timestamp", "<=", Timestamp.fromDate(weekEnd))
+      );
+      const weekSnap = await getDocs(weekQ);
+      setWeekCount(weekSnap.size);
+      
+      // THIS MONTH count
+      const { start: monthStart, end: monthEnd } = getMonthRange();
+      const monthQ = query(visitsRef,
+        where("timestamp", ">=", Timestamp.fromDate(monthStart)),
+        where("timestamp", "<=", Timestamp.fromDate(monthEnd))
+      );
+      const monthSnap = await getDocs(monthQ);
+      setMonthCount(monthSnap.size);
+
+      // ALL TIME count
+      const allSnap = await getDocs(visitsRef);
+      setAllTimeCount(allSnap.size);
+
+      // PEAK HOUR
+      const hourCounts: Record<number, number> = {};
+      todaySnap.docs.forEach(doc => {
+        const ts = doc.data().timestamp?.toDate();
+        if (ts) {
+          const hour = ts.getHours();
+          hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+        }
+      });
+      const peakHourEntry = Object.entries(hourCounts)
+        .sort((a, b) => b[1] - a[1])[0];
+      if (peakHourEntry) {
+        const h = parseInt(peakHourEntry[0]);
+        const ampm = h >= 12 ? "PM" : "AM";
+        const h12 = h % 12 || 12;
+        setPeakHour(`${h12}:00 ${ampm}`);
+      } else {
+        setPeakHour("No data yet");
+      }
+
+      // VISITOR TRAJECTORY
+      const last7Days = Array.from({length: 7}, (_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - (6 - i));
+        return d.toISOString().split("T")[0];
+      });
+      
+      const trajectoryData = last7Days.map(dateStr => {
+        const count = allSnap.docs.filter(doc => 
+          doc.data().date === dateStr
+        ).length;
+        const dayName = new Date(dateStr).toLocaleDateString(
+          "en-US", { weekday: "short" }
+        );
+        return { date: dayName, count };
+      });
+      setChartData(trajectoryData);
+
+      setLoading(false);
+    } catch (error) {
+      console.error("Stats error:", error);
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (!db) return;
-    const q = query(collection(db, "visits"), orderBy("timestamp", "desc"), limit(50));
-    const unsubscribe = onSnapshot(q, 
-      (snapshot) => {
-        setVisits(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Visit)));
-        setLoading(false);
+    fetchStats();
+  }, [db]);
+
+  const handleFilterChange = async (filter: string) => {
+    setLoading(true);
+    setActiveFilter(filter);
+    let startDate: Date;
+    let endDate = new Date();
+    endDate.setHours(23, 59, 59, 999);
+
+    if (filter === "Today") {
+      const range = getTodayRange();
+      startDate = range.start;
+      endDate = range.end;
+    } else if (filter === "This Week") {
+      const range = getWeekRange();
+      startDate = range.start;
+      endDate = range.end;
+    } else if (filter === "This Month") {
+      const range = getMonthRange();
+      startDate = range.start;
+      endDate = range.end;
+    } else {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const visitsRef = collection(db, "visits");
+      const q = query(visitsRef,
+        where("timestamp", ">=", Timestamp.fromDate(startDate)),
+        where("timestamp", "<=", Timestamp.fromDate(endDate)),
+        orderBy("timestamp", "desc")
+      );
+      const snap = await getDocs(q);
+      const data = snap.docs.map(doc => ({
+        id: doc.id, ...doc.data()
+      } as Visit));
+      setFilteredVisits(data);
+      setCurrentlyInside(snap.size);
+    } catch (e) {
+      console.error("Filter error:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    const { default: jsPDF } = await import("jspdf");
+    const { default: autoTable } = await import("jspdf-autotable");
+    
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFillColor(0, 102, 0);
+    doc.rect(0, 0, 210, 25, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("NEU Library Visitor Log", 14, 12);
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 20);
+    doc.text(`Filter: ${activeFilter}`, 150, 20);
+    
+    // Stats row
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(11);
+    doc.text(`Total Visits: ${filteredVisits.length}`, 14, 35);
+    
+    // Table
+    autoTable(doc, {
+      startY: 42,
+      head: [["Name", "Program", "College", "Reason", "Date", "Time"]],
+      body: filteredVisits.map((v: any) => [
+        v.displayName || "N/A",
+        v.program || "N/A", 
+        v.college || "N/A",
+        v.reason || "N/A",
+        v.date || "N/A",
+        v.timestamp?.toDate?.()
+          .toLocaleTimeString("en-US", {
+            hour: "2-digit", minute: "2-digit"
+          }) || "N/A",
+      ]),
+      headStyles: { 
+        fillColor: [0, 102, 0],
+        textColor: [255, 255, 255],
+        fontStyle: "bold"
       },
-      (error) => {
-        console.error("Error fetching visits:", error);
-        setLoading(false);
-      }
-    );
-    return () => unsubscribe();
-  }, []);
+      alternateRowStyles: { fillColor: [245, 248, 245] },
+      styles: { fontSize: 9 },
+    });
+    
+    doc.save(`NEU-Library-Visitors-${activeFilter}-${new Date().toISOString().split("T")[0]}.pdf`);
+  };
 
-  const stats = useMemo(() => {
-    const today = startOfDay(new Date());
-    const todayVisits = visits.filter(v => v.timestamp && isSameDay(v.timestamp.toDate(), today));
-    return {
-      todayCount: todayVisits.length,
-      insideCount: Math.min(todayVisits.length, 12),
-      peakTime: "2:00 PM"
-    };
-  }, [visits]);
-
-  const chartData = useMemo(() => {
-    return [
-      { date: 'Mon', count: 120 },
-      { date: 'Tue', count: 150 },
-      { date: 'Wed', count: 180 },
-      { date: 'Thu', count: 140 },
-      { date: 'Fri', count: 210 },
-      { date: 'Sat', count: 90 },
-      { date: 'Sun', count: 40 },
-    ];
-  }, []);
-
-  const filteredVisits = visits.filter(v => 
+  const searchFilteredResults = filteredVisits.filter(v => 
     v.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     v.program?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     v.reason?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -93,7 +282,7 @@ export default function AdminDashboard() {
 
   const getInitials = (name: string) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : "??";
 
-  if (authLoading || loading) {
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f5f8f5]">
         <Loader2 className="h-10 w-10 animate-spin text-[#006600]" />
@@ -142,8 +331,8 @@ export default function AdminDashboard() {
               <div className="space-y-1">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Visitors Today</p>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold text-[#006600]">{stats.todayCount}</span>
-                  <span className="text-[10px] font-bold text-green-600">↑ 12% vs yesterday</span>
+                  <span className="text-3xl font-bold text-[#006600]">{todayCount}</span>
+                  <span className="text-[10px] font-bold text-green-600">Active Logs</span>
                 </div>
               </div>
               <div className="h-12 w-12 bg-[#006600]/10 rounded-xl flex items-center justify-center">
@@ -155,9 +344,9 @@ export default function AdminDashboard() {
           <Card className="rounded-2xl border-none shadow-md overflow-hidden bg-white">
             <CardContent className="p-6 flex items-center justify-between">
               <div className="space-y-3 flex-1 mr-4">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Currently Inside</p>
-                <span className="text-3xl font-bold text-slate-800">{stats.insideCount}</span>
-                <Progress value={45} className="h-1.5 bg-slate-100" />
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Currently Logged</p>
+                <span className="text-3xl font-bold text-slate-800">{currentlyInside}</span>
+                <Progress value={Math.min((currentlyInside / 100) * 100, 100)} className="h-1.5 bg-slate-100" />
               </div>
               <div className="h-12 w-12 bg-blue-50 rounded-xl flex items-center justify-center">
                 <Users className="h-6 w-6 text-blue-600" />
@@ -169,8 +358,8 @@ export default function AdminDashboard() {
             <CardContent className="p-6 flex items-center justify-between">
               <div className="space-y-1">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Peak Hour</p>
-                <span className="text-3xl font-bold text-slate-800">{stats.peakTime}</span>
-                <p className="text-[10px] font-medium text-muted-foreground">Estimated based on trends</p>
+                <span className="text-3xl font-bold text-slate-800">{peakHour}</span>
+                <p className="text-[10px] font-medium text-muted-foreground">Based on today&apos;s activity</p>
               </div>
               <div className="h-12 w-12 bg-amber-50 rounded-xl flex items-center justify-center">
                 <TrendingUp className="h-6 w-6 text-amber-600" />
@@ -204,9 +393,30 @@ export default function AdminDashboard() {
 
         <div className="space-y-4">
           <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-            <Button size="sm" className="bg-[#006600] hover:bg-[#004d00] text-white rounded-full px-5 text-xs font-bold">Today</Button>
-            <Button size="sm" variant="outline" className="rounded-full border-slate-200 text-xs font-bold bg-white">This Week <ChevronDown className="ml-1 h-3 w-3" /></Button>
-            <Button size="sm" variant="outline" className="rounded-full border-slate-200 text-xs font-bold bg-white">This Month <ChevronDown className="ml-1 h-3 w-3" /></Button>
+            <button 
+              onClick={() => handleFilterChange("Today")}
+              className={activeFilter === "Today" 
+                ? "bg-[#006600] text-white px-5 py-2 rounded-full text-xs font-bold shadow-md transition-all"
+                : "bg-white border border-slate-200 text-slate-600 px-5 py-2 rounded-full text-xs font-bold hover:bg-slate-50 transition-all"}
+            >
+              Today
+            </button>
+            <button 
+              onClick={() => handleFilterChange("This Week")}
+              className={activeFilter === "This Week" 
+                ? "bg-[#006600] text-white px-5 py-2 rounded-full text-xs font-bold shadow-md transition-all"
+                : "bg-white border border-slate-200 text-slate-600 px-5 py-2 rounded-full text-xs font-bold hover:bg-slate-50 transition-all"}
+            >
+              This Week
+            </button>
+            <button 
+              onClick={() => handleFilterChange("This Month")}
+              className={activeFilter === "This Month" 
+                ? "bg-[#006600] text-white px-5 py-2 rounded-full text-xs font-bold shadow-md transition-all"
+                : "bg-white border border-slate-200 text-slate-600 px-5 py-2 rounded-full text-xs font-bold hover:bg-slate-50 transition-all"}
+            >
+              This Month
+            </button>
             <Button size="sm" variant="ghost" className="rounded-full text-slate-400 p-2"><CalendarIcon className="h-4 w-4" /></Button>
           </div>
 
@@ -220,7 +430,10 @@ export default function AdminDashboard() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Button className="w-full h-11 bg-[#D4AF37] hover:bg-[#b8952d] text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 uppercase tracking-wider">
+            <Button 
+              onClick={handleExportPDF}
+              className="w-full h-11 bg-[#D4AF37] hover:bg-[#b8952d] text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 uppercase tracking-wider"
+            >
               <Printer className="h-4 w-4" />
               Export to PDF
             </Button>
@@ -229,10 +442,16 @@ export default function AdminDashboard() {
 
         <Card className="rounded-2xl border-none shadow-md overflow-hidden bg-white">
           <div className="p-4 border-b bg-slate-50/50">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Recent Activity</h3>
+            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+              {activeFilter} Records
+            </h3>
           </div>
           <div className="divide-y divide-slate-100">
-            {filteredVisits.map((visit) => (
+            {loading ? (
+              <div className="p-12 flex justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-[#006600]" />
+              </div>
+            ) : searchFilteredResults.map((visit) => (
               <div key={visit.id} className="p-4 flex items-center gap-3 hover:bg-slate-50 transition-colors">
                 <div className="h-10 w-10 bg-[#006600]/10 rounded-full flex items-center justify-center text-[#006600] font-bold text-xs shrink-0">
                   {getInitials(visit.displayName)}
@@ -241,19 +460,24 @@ export default function AdminDashboard() {
                   <p className="font-bold text-sm text-slate-800 truncate">{visit.displayName || "Unknown User"}</p>
                   <p className="text-[10px] text-[#006600] font-bold uppercase truncate tracking-tight">{visit.program || "GENERAL"}</p>
                 </div>
-                <Badge variant="outline" className="text-[9px] font-bold text-muted-foreground border-slate-200 rounded-lg shrink-0 uppercase">
-                  {visit.reason ? visit.reason.split(',')[0] : "OTHER"}
-                </Badge>
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  <Badge variant="outline" className="text-[9px] font-bold text-muted-foreground border-slate-200 rounded-lg uppercase">
+                    {visit.reason ? visit.reason.split(',')[0] : "OTHER"}
+                  </Badge>
+                  <span className="text-[8px] text-slate-400 font-bold">
+                    {visit.timestamp?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
               </div>
             ))}
-            {filteredVisits.length === 0 && (
+            {!loading && searchFilteredResults.length === 0 && (
               <div className="p-12 text-center text-muted-foreground text-sm italic">
-                No matching records found
+                No matching records found for {activeFilter}
               </div>
             )}
           </div>
           <div className="p-4 bg-slate-50/50 border-t flex items-center justify-between">
-            <p className="text-[10px] font-bold text-slate-400">Showing {filteredVisits.length} entries</p>
+            <p className="text-[10px] font-bold text-slate-400">Showing {searchFilteredResults.length} entries</p>
           </div>
         </Card>
       </main>
