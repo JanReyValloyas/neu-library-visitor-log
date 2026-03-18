@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -331,37 +330,30 @@ export default function AdminDashboard() {
 
             {showNotifications && (
               <div className="absolute right-0 top-12 w-72 bg-white rounded-xl shadow-2xl border border-primary/10 z-50">
-                <div className="p-3 border-b border-primary/10 flex justify-between items-center">
+                <div className="p-3 border-b border-primary/10">
                   <h3 className="font-bold text-sm text-[#006600]">
                     Recent Check-ins
                   </h3>
-                  <button onClick={() => setShowNotifications(false)} className="text-slate-400 hover:text-slate-600">
-                    <X className="h-4 w-4" />
-                  </button>
                 </div>
                 <div className="max-h-60 overflow-y-auto">
-                  {notifications.length === 0 ? (
-                    <p className="text-center text-slate-400 text-sm py-6">No recent check-ins</p>
-                  ) : (
-                    notifications.map((notif) => (
-                      <div key={notif.id} className="p-3 border-b border-slate-50 last:border-none">
-                        <p className="text-sm font-semibold text-slate-800">
-                          {notif.displayName}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {notif.program} • {notif.reason?.split(',')[0]}
-                        </p>
-                        <p className="text-xs text-[#006600] font-bold mt-1">
-                          {notif.timestamp?.toDate?.() ? format(notif.timestamp.toDate(), "h:mm a") : "Just now"}
-                        </p>
-                      </div>
-                    ))
-                  )}
-                </div>
-                <div className="p-2 text-center border-t bg-slate-50/30">
-                  <button className="text-[10px] text-[#006600] font-bold uppercase tracking-widest hover:underline">
-                    View All Activity
-                  </button>
+                  {notifications.map((notif) => (
+                    <div key={notif.id} className="p-3 border-b border-slate-50">
+                      <p className="text-sm font-semibold">
+                        {notif.displayName}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {notif.program} • {notif.reason}
+                      </p>
+                      <p className="text-xs text-[#006600]">
+                        {notif.timestamp?.toDate?.()
+                          ? notif.timestamp.toDate().toLocaleTimeString("en-US", {
+                              hour: "2-digit",
+                              minute: "2-digit"
+                            })
+                          : "Just now"}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
