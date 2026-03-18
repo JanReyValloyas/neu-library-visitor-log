@@ -66,8 +66,7 @@ export default function AdminDashboard() {
 
   // Notifications state
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState<Visit[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifications, setNotifications] = useState<any[]>([]);
 
   const getTodayRange = () => {
     const start = startOfDay(new Date());
@@ -95,26 +94,17 @@ export default function AdminDashboard() {
 
   // Real-time Notifications Listener
   useEffect(() => {
-    if (!db) return;
     const visitsRef = collection(db, "visits");
-    const q = query(visitsRef, orderBy("timestamp", "desc"), limit(20));
-    
+    const q = query(visitsRef, orderBy("timestamp", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const recent = snapshot.docs.slice(0, 5).map(doc => ({
         id: doc.id,
         ...doc.data(),
-      } as Visit));
+      }));
       setNotifications(recent);
-      
-      // Count added docs that are new
-      const additions = snapshot.docChanges().filter(change => change.type === "added");
-      if (additions.length > 0 && !loading) {
-        setUnreadCount(prev => prev + additions.length);
-      }
     });
-    
     return () => unsubscribe();
-  }, [loading]);
+  }, []);
 
   const fetchStats = async () => {
     if (!db) return;
@@ -334,57 +324,42 @@ export default function AdminDashboard() {
               className="relative h-9 w-9 rounded-full hover:bg-slate-100"
               onClick={() => {
                 setShowNotifications(!showNotifications);
-                setUnreadCount(0);
               }}
             >
               <Bell className="h-5 w-5 text-slate-600" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center font-bold border-2 border-white">
-                  {unreadCount}
-                </span>
-              )}
             </Button>
 
             {showNotifications && (
-              <div className="absolute right-0 top-11 w-80 bg-white rounded-2xl shadow-2xl border border-slate-100 z-[100] animate-in slide-in-from-top-2 duration-200">
-                <div className="p-4 border-b flex justify-between items-center bg-slate-50/50 rounded-t-2xl">
-                  <h3 className="font-bold text-xs text-[#1a237e] uppercase tracking-widest">
+              <div className="absolute right-0 top-12 w-72 bg-white rounded-xl shadow-2xl border border-primary/10 z-50">
+                <div className="p-3 border-b border-primary/10 flex justify-between items-center">
+                  <h3 className="font-bold text-sm text-[#006600]">
                     Recent Check-ins
                   </h3>
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowNotifications(false)}>
-                    <X className="h-4 w-4 text-slate-400" />
-                  </Button>
+                  <button onClick={() => setShowNotifications(false)} className="text-slate-400 hover:text-slate-600">
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
-                <div className="max-h-80 overflow-y-auto scrollbar-hide">
+                <div className="max-h-60 overflow-y-auto">
                   {notifications.length === 0 ? (
-                    <div className="p-8 text-center">
-                      <p className="text-slate-400 text-xs italic">No recent check-ins</p>
-                    </div>
+                    <p className="text-center text-slate-400 text-sm py-6">No recent check-ins</p>
                   ) : (
                     notifications.map((notif) => (
-                      <div key={notif.id} className="p-4 border-b border-slate-50 hover:bg-slate-50 transition-colors last:border-none">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-[#1a237e]/10 text-[#1a237e] flex items-center justify-center text-xs font-bold">
-                            {getInitials(notif.displayName)}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold text-slate-800 truncate">
-                              {notif.displayName || "Unknown"}
-                            </p>
-                            <p className="text-[10px] text-slate-500 truncate font-medium">
-                              {notif.program} • {notif.reason?.split(',')[0]}
-                            </p>
-                            <p className="text-[9px] text-[#1a237e] font-bold mt-1 uppercase tracking-tighter">
-                              {notif.timestamp?.toDate?.() ? format(notif.timestamp.toDate(), "h:mm a") : "Just now"}
-                            </p>
-                          </div>
-                        </div>
+                      <div key={notif.id} className="p-3 border-b border-slate-50 last:border-none">
+                        <p className="text-sm font-semibold text-slate-800">
+                          {notif.displayName}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {notif.program} • {notif.reason?.split(',')[0]}
+                        </p>
+                        <p className="text-xs text-[#006600] font-bold mt-1">
+                          {notif.timestamp?.toDate?.() ? format(notif.timestamp.toDate(), "h:mm a") : "Just now"}
+                        </p>
                       </div>
                     ))
                   )}
                 </div>
-                <div className="p-3 text-center border-t bg-slate-50/30 rounded-b-2xl">
-                  <button className="text-[10px] text-[#1a237e] font-bold uppercase tracking-widest hover:underline">
+                <div className="p-2 text-center border-t bg-slate-50/30">
+                  <button className="text-[10px] text-[#006600] font-bold uppercase tracking-widest hover:underline">
                     View All Activity
                   </button>
                 </div>
