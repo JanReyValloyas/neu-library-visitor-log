@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -27,10 +28,12 @@ import {
   TrendingUp, 
   Calendar as CalendarIcon,
   ChevronDown,
-  Loader2
+  Loader2,
+  X,
+  CalendarDays
 } from "lucide-react";
 import { BottomNav } from "@/components/admin/bottom-nav";
-import { format, isSameDay, startOfDay } from "date-fns";
+import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -42,12 +45,12 @@ interface Visit {
   college: string;
   reason: string;
   date: string;
-  timestamp: Timestamp | null;
+  timestamp: any;
+  email?: string;
 }
 
 export default function AdminDashboard() {
   const { user, role, loading: authLoading } = useAuth();
-  const [visits, setVisits] = useState<Visit[]>([]);
   const [filteredVisits, setFilteredVisits] = useState<Visit[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
@@ -57,16 +60,18 @@ export default function AdminDashboard() {
   const [weekCount, setWeekCount] = useState(0);
   const [monthCount, setMonthCount] = useState(0);
   const [allTimeCount, setAllTimeCount] = useState(0);
-  const [currentlyInside, setCurrentlyInside] = useState(0);
   const [peakHour, setPeakHour] = useState("Loading...");
   const [chartData, setChartData] = useState<any[]>([]);
   const [activeFilter, setActiveFilter] = useState("Today");
 
+  // Notifications state
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<Visit[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
   const getTodayRange = () => {
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    const end = new Date();
-    end.setHours(23, 59, 59, 999);
+    const start = startOfDay(new Date());
+    const end = endOfDay(new Date());
     return { start, end };
   }
 
@@ -76,8 +81,7 @@ export default function AdminDashboard() {
     const diff = now.getDate() - day + (day === 0 ? -6 : 1);
     const start = new Date(now.setDate(diff));
     start.setHours(0, 0, 0, 0);
-    const end = new Date();
-    end.setHours(23, 59, 59, 999);
+    const end = endOfDay(new Date());
     return { start, end };
   }
 
@@ -85,10 +89,32 @@ export default function AdminDashboard() {
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), 1);
     start.setHours(0, 0, 0, 0);
-    const end = new Date();
-    end.setHours(23, 59, 59, 999);
+    const end = endOfDay(new Date());
     return { start, end };
   }
+
+  // Real-time Notifications Listener
+  useEffect(() => {
+    if (!db) return;
+    const visitsRef = collection(db, "visits");
+    const q = query(visitsRef, orderBy("timestamp", "desc"), limit(20));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const recent = snapshot.docs.slice(0, 5).map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      } as Visit));
+      setNotifications(recent);
+      
+      // Count added docs that are new
+      const additions = snapshot.docChanges().filter(change => change.type === "added");
+      if (additions.length > 0 && !loading) {
+        setUnreadCount(prev => prev + additions.length);
+      }
+    });
+    
+    return () => unsubscribe();
+  }, [loading]);
 
   const fetchStats = async () => {
     if (!db) return;
@@ -106,9 +132,7 @@ export default function AdminDashboard() {
       
       // Initial view: Today
       const initialVisits = todaySnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Visit));
-      setVisits(initialVisits);
       setFilteredVisits(initialVisits);
-      setCurrentlyInside(todaySnap.size);
       
       // THIS WEEK count
       const { start: weekStart, end: weekEnd } = getWeekRange();
@@ -152,20 +176,17 @@ export default function AdminDashboard() {
         setPeakHour("No data yet");
       }
 
-      // VISITOR TRAJECTORY
+      // VISITOR TRAJECTORY (Last 7 Days)
       const last7Days = Array.from({length: 7}, (_, i) => {
-        const d = new Date();
-        d.setDate(d.getDate() - (6 - i));
-        return d.toISOString().split("T")[0];
+        const d = subDays(new Date(), 6 - i);
+        return format(d, "yyyy-MM-dd");
       });
       
       const trajectoryData = last7Days.map(dateStr => {
         const count = allSnap.docs.filter(doc => 
           doc.data().date === dateStr
         ).length;
-        const dayName = new Date(dateStr).toLocaleDateString(
-          "en-US", { weekday: "short" }
-        );
+        const dayName = format(new Date(dateStr), "EEE");
         return { date: dayName, count };
       });
       setChartData(trajectoryData);
@@ -179,27 +200,23 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchStats();
-  }, [db]);
+  }, []);
 
   const handleFilterChange = async (filter: string) => {
     setLoading(true);
     setActiveFilter(filter);
     let startDate: Date;
-    let endDate = new Date();
-    endDate.setHours(23, 59, 59, 999);
+    let endDate = endOfDay(new Date());
 
     if (filter === "Today") {
       const range = getTodayRange();
       startDate = range.start;
-      endDate = range.end;
     } else if (filter === "This Week") {
       const range = getWeekRange();
       startDate = range.start;
-      endDate = range.end;
     } else if (filter === "This Month") {
       const range = getMonthRange();
       startDate = range.start;
-      endDate = range.end;
     } else {
       setLoading(false);
       return;
@@ -217,7 +234,6 @@ export default function AdminDashboard() {
         id: doc.id, ...doc.data()
       } as Visit));
       setFilteredVisits(data);
-      setCurrentlyInside(snap.size);
     } catch (e) {
       console.error("Filter error:", e);
     } finally {
@@ -231,8 +247,7 @@ export default function AdminDashboard() {
     
     const doc = new jsPDF();
     
-    // Header
-    doc.setFillColor(0, 102, 0);
+    doc.setFillColor(26, 35, 126); // Use Navy Blue from requirements
     doc.rect(0, 0, 210, 25, "F");
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(16);
@@ -242,12 +257,10 @@ export default function AdminDashboard() {
     doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 20);
     doc.text(`Filter: ${activeFilter}`, 150, 20);
     
-    // Stats row
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(11);
     doc.text(`Total Visits: ${filteredVisits.length}`, 14, 35);
     
-    // Table
     autoTable(doc, {
       startY: 42,
       head: [["Name", "Program", "College", "Reason", "Date", "Time"]],
@@ -263,15 +276,15 @@ export default function AdminDashboard() {
           }) || "N/A",
       ]),
       headStyles: { 
-        fillColor: [0, 102, 0],
+        fillColor: [26, 35, 126],
         textColor: [255, 255, 255],
         fontStyle: "bold"
       },
-      alternateRowStyles: { fillColor: [245, 248, 245] },
-      styles: { fontSize: 9 },
+      alternateRowStyles: { fillColor: [240, 244, 245] },
+      styles: { fontSize: 8 },
     });
     
-    doc.save(`NEU-Library-Visitors-${activeFilter}-${new Date().toISOString().split("T")[0]}.pdf`);
+    doc.save(`NEU-Library-Visitors-${activeFilter}-${format(new Date(), "yyyy-MM-dd")}.pdf`);
   };
 
   const searchFilteredResults = filteredVisits.filter(v => 
@@ -284,8 +297,8 @@ export default function AdminDashboard() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f5f8f5]">
-        <Loader2 className="h-10 w-10 animate-spin text-[#006600]" />
+      <div className="min-h-screen flex items-center justify-center bg-[#f0f4f5]">
+        <Loader2 className="h-10 w-10 animate-spin text-[#1a237e]" />
       </div>
     );
   }
@@ -302,74 +315,142 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen pb-20 bg-[#f5f8f5]">
-      <header className="p-6 flex items-center justify-between bg-white border-b sticky top-0 z-10">
+    <div className="flex flex-col min-h-screen pb-20 bg-[#f0f4f5]">
+      <header className="p-6 flex items-center justify-between bg-white border-b sticky top-0 z-50">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-[#006600] rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-md">
+          <div className="w-10 h-10 bg-[#1a237e] rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-md">
             NEU
           </div>
           <div>
             <h1 className="font-bold text-sm tracking-tight text-slate-800">NEU Library</h1>
-            <p className="text-[10px] font-bold text-[#D4AF37] uppercase tracking-widest">ADMIN DASHBOARD</p>
+            <p className="text-[10px] font-bold text-[#ffd700] uppercase tracking-widest">ADMIN DASHBOARD</p>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" className="relative h-8 w-8">
-            <Bell className="h-5 w-5 text-slate-600" />
-            <div className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
-          </Button>
-          <Avatar className="h-8 w-8 border-2 border-[#D4AF37]">
-            <AvatarFallback className="bg-slate-100 text-[10px]">{user.displayName?.charAt(0)}</AvatarFallback>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="relative h-9 w-9 rounded-full hover:bg-slate-100"
+              onClick={() => {
+                setShowNotifications(!showNotifications);
+                setUnreadCount(0);
+              }}
+            >
+              <Bell className="h-5 w-5 text-slate-600" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center font-bold border-2 border-white">
+                  {unreadCount}
+                </span>
+              )}
+            </Button>
+
+            {showNotifications && (
+              <div className="absolute right-0 top-11 w-80 bg-white rounded-2xl shadow-2xl border border-slate-100 z-[100] animate-in slide-in-from-top-2 duration-200">
+                <div className="p-4 border-b flex justify-between items-center bg-slate-50/50 rounded-t-2xl">
+                  <h3 className="font-bold text-xs text-[#1a237e] uppercase tracking-widest">
+                    Recent Check-ins
+                  </h3>
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowNotifications(false)}>
+                    <X className="h-4 w-4 text-slate-400" />
+                  </Button>
+                </div>
+                <div className="max-h-80 overflow-y-auto scrollbar-hide">
+                  {notifications.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <p className="text-slate-400 text-xs italic">No recent check-ins</p>
+                    </div>
+                  ) : (
+                    notifications.map((notif) => (
+                      <div key={notif.id} className="p-4 border-b border-slate-50 hover:bg-slate-50 transition-colors last:border-none">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-[#1a237e]/10 text-[#1a237e] flex items-center justify-center text-xs font-bold">
+                            {getInitials(notif.displayName)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-slate-800 truncate">
+                              {notif.displayName || "Unknown"}
+                            </p>
+                            <p className="text-[10px] text-slate-500 truncate font-medium">
+                              {notif.program} • {notif.reason?.split(',')[0]}
+                            </p>
+                            <p className="text-[9px] text-[#1a237e] font-bold mt-1 uppercase tracking-tighter">
+                              {notif.timestamp?.toDate?.() ? format(notif.timestamp.toDate(), "h:mm a") : "Just now"}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div className="p-3 text-center border-t bg-slate-50/30 rounded-b-2xl">
+                  <button className="text-[10px] text-[#1a237e] font-bold uppercase tracking-widest hover:underline">
+                    View All Activity
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <Avatar className="h-9 w-9 border-2 border-[#ffd700]">
+            <AvatarFallback className="bg-slate-100 text-[10px] font-bold">{user.displayName?.charAt(0)}</AvatarFallback>
           </Avatar>
         </div>
       </header>
 
       <main className="p-4 space-y-6 animate-in fade-in duration-500">
-        <div className="grid grid-cols-1 gap-4">
+        <div className="grid grid-cols-2 gap-3">
           <Card className="rounded-2xl border-none shadow-md overflow-hidden bg-white">
-            <CardContent className="p-6 flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Visitors Today</p>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold text-[#006600]">{todayCount}</span>
-                  <span className="text-[10px] font-bold text-green-600">Active Logs</span>
-                </div>
+            <CardContent className="p-4 flex flex-col justify-between h-full">
+              <div className="h-8 w-8 bg-[#1a237e]/10 rounded-lg flex items-center justify-center mb-2">
+                <Users className="h-4 w-4 text-[#1a237e]" />
               </div>
-              <div className="h-12 w-12 bg-[#006600]/10 rounded-xl flex items-center justify-center">
-                <Clock className="h-6 w-6 text-[#006600]" />
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Today's Visits</p>
+                <p className="text-2xl font-bold text-[#1a237e]">{todayCount}</p>
               </div>
             </CardContent>
           </Card>
 
           <Card className="rounded-2xl border-none shadow-md overflow-hidden bg-white">
-            <CardContent className="p-6 flex items-center justify-between">
-              <div className="space-y-3 flex-1 mr-4">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Currently Logged</p>
-                <span className="text-3xl font-bold text-slate-800">{currentlyInside}</span>
-                <Progress value={Math.min((currentlyInside / 100) * 100, 100)} className="h-1.5 bg-slate-100" />
+            <CardContent className="p-4 flex flex-col justify-between h-full">
+              <div className="h-8 w-8 bg-blue-50 rounded-lg flex items-center justify-center mb-2">
+                <CalendarDays className="h-4 w-4 text-blue-600" />
               </div>
-              <div className="h-12 w-12 bg-blue-50 rounded-xl flex items-center justify-center">
-                <Users className="h-6 w-6 text-blue-600" />
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">This Week</p>
+                <p className="text-2xl font-bold text-slate-800">{weekCount}</p>
               </div>
             </CardContent>
           </Card>
 
           <Card className="rounded-2xl border-none shadow-md overflow-hidden bg-white">
-            <CardContent className="p-6 flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Peak Hour</p>
-                <span className="text-3xl font-bold text-slate-800">{peakHour}</span>
-                <p className="text-[10px] font-medium text-muted-foreground">Based on today&apos;s activity</p>
+            <CardContent className="p-4 flex flex-col justify-between h-full">
+              <div className="h-8 w-8 bg-amber-50 rounded-lg flex items-center justify-center mb-2">
+                <Clock className="h-4 w-4 text-amber-600" />
               </div>
-              <div className="h-12 w-12 bg-amber-50 rounded-xl flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-amber-600" />
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Peak Hour</p>
+                <p className="text-lg font-bold text-slate-800">{peakHour}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl border-none shadow-md overflow-hidden bg-white">
+            <CardContent className="p-4 flex flex-col justify-between h-full">
+              <div className="h-8 w-8 bg-purple-50 rounded-lg flex items-center justify-center mb-2">
+                <TrendingUp className="h-4 w-4 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">All-Time</p>
+                <p className="text-2xl font-bold text-slate-800">{allTimeCount}</p>
               </div>
             </CardContent>
           </Card>
         </div>
 
         <div className="space-y-4">
-          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest px-1">Visitor Trajectory</h3>
+          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest px-1">Visitor Volume</h3>
           <Card className="rounded-2xl border-none shadow-md p-4 bg-white">
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={chartData}>
@@ -378,14 +459,14 @@ export default function AdminDashboard() {
                   dataKey="date" 
                   axisLine={false} 
                   tickLine={false} 
-                  tick={{ fontSize: 10, fontWeight: 600, fill: '#64748b' }} 
+                  tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} 
                 />
                 <YAxis hide />
                 <Tooltip 
                   cursor={{ fill: '#f8fafc' }}
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '10px' }}
                 />
-                <Bar dataKey="count" fill="#006600" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="count" fill="#1a237e" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </Card>
@@ -393,98 +474,80 @@ export default function AdminDashboard() {
 
         <div className="space-y-4">
           <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-            <button 
-              onClick={() => handleFilterChange("Today")}
-              className={activeFilter === "Today" 
-                ? "bg-[#006600] text-white px-5 py-2 rounded-full text-xs font-bold shadow-md transition-all"
-                : "bg-white border border-slate-200 text-slate-600 px-5 py-2 rounded-full text-xs font-bold hover:bg-slate-50 transition-all"}
-            >
-              Today
-            </button>
-            <button 
-              onClick={() => handleFilterChange("This Week")}
-              className={activeFilter === "This Week" 
-                ? "bg-[#006600] text-white px-5 py-2 rounded-full text-xs font-bold shadow-md transition-all"
-                : "bg-white border border-slate-200 text-slate-600 px-5 py-2 rounded-full text-xs font-bold hover:bg-slate-50 transition-all"}
-            >
-              This Week
-            </button>
-            <button 
-              onClick={() => handleFilterChange("This Month")}
-              className={activeFilter === "This Month" 
-                ? "bg-[#006600] text-white px-5 py-2 rounded-full text-xs font-bold shadow-md transition-all"
-                : "bg-white border border-slate-200 text-slate-600 px-5 py-2 rounded-full text-xs font-bold hover:bg-slate-50 transition-all"}
-            >
-              This Month
-            </button>
-            <Button size="sm" variant="ghost" className="rounded-full text-slate-400 p-2"><CalendarIcon className="h-4 w-4" /></Button>
+            {["Today", "This Week", "This Month"].map((f) => (
+              <button 
+                key={f}
+                onClick={() => handleFilterChange(f)}
+                className={activeFilter === f 
+                  ? "bg-[#1a237e] text-white px-5 py-2 rounded-full text-[10px] font-bold shadow-md transition-all uppercase tracking-wider"
+                  : "bg-white border border-slate-200 text-slate-500 px-5 py-2 rounded-full text-[10px] font-bold hover:bg-slate-50 transition-all uppercase tracking-wider"}
+              >
+                {f}
+              </button>
+            ))}
           </div>
 
           <div className="space-y-3">
             <div className="relative group">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-[#006600] transition-colors" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-[#1a237e] transition-colors" />
               <Input 
-                placeholder="Search name, program, or reason..." 
-                className="pl-10 h-11 bg-white border-slate-200 rounded-xl focus-visible:ring-[#006600] shadow-sm"
+                placeholder="Search visitor logs..." 
+                className="pl-10 h-12 bg-white border-slate-200 rounded-xl focus-visible:ring-[#1a237e] shadow-sm"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
             <Button 
               onClick={handleExportPDF}
-              className="w-full h-11 bg-[#D4AF37] hover:bg-[#b8952d] text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 uppercase tracking-wider"
+              className="w-full h-12 bg-[#ffd700] hover:bg-[#e6c200] text-[#1a237e] font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 uppercase tracking-wider text-xs"
             >
               <Printer className="h-4 w-4" />
-              Export to PDF
+              Generate PDF Report
             </Button>
           </div>
         </div>
 
-        <Card className="rounded-2xl border-none shadow-md overflow-hidden bg-white">
-          <div className="p-4 border-b bg-slate-50/50">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+        <Card className="rounded-2xl border-none shadow-md overflow-hidden bg-white mb-6">
+          <div className="p-4 border-b bg-slate-50/50 flex justify-between items-center">
+            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
               {activeFilter} Records
             </h3>
+            <Badge variant="outline" className="text-[9px] font-bold text-slate-400 bg-white border-slate-200">
+              {searchFilteredResults.length} Entries
+            </Badge>
           </div>
           <div className="divide-y divide-slate-100">
             {loading ? (
               <div className="p-12 flex justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-[#006600]" />
+                <Loader2 className="h-6 w-6 animate-spin text-[#1a237e]" />
               </div>
             ) : searchFilteredResults.map((visit) => (
-              <div key={visit.id} className="p-4 flex items-center gap-3 hover:bg-slate-50 transition-colors">
-                <div className="h-10 w-10 bg-[#006600]/10 rounded-full flex items-center justify-center text-[#006600] font-bold text-xs shrink-0">
+              <div key={visit.id} className="p-4 flex items-center gap-3 hover:bg-slate-50 transition-colors group">
+                <div className="h-10 w-10 bg-[#1a237e]/5 rounded-xl flex items-center justify-center text-[#1a237e] font-bold text-xs shrink-0 group-hover:bg-[#1a237e] group-hover:text-white transition-all duration-300">
                   {getInitials(visit.displayName)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-sm text-slate-800 truncate">{visit.displayName || "Unknown User"}</p>
-                  <p className="text-[10px] text-[#006600] font-bold uppercase truncate tracking-tight">{visit.program || "GENERAL"}</p>
+                  <p className="text-[10px] text-[#1a237e] font-bold uppercase truncate tracking-tight">{visit.program || "GENERAL"}</p>
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0">
-                  <Badge variant="outline" className="text-[9px] font-bold text-muted-foreground border-slate-200 rounded-lg uppercase">
+                  <Badge variant="outline" className="text-[9px] font-bold text-slate-500 border-slate-200 rounded-lg uppercase bg-slate-50">
                     {visit.reason ? visit.reason.split(',')[0] : "OTHER"}
                   </Badge>
-                  <span className="text-[8px] text-slate-400 font-bold">
-                    {visit.timestamp?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">
+                    {visit.timestamp?.toDate?.() ? format(visit.timestamp.toDate(), "h:mm a") : "N/A"}
                   </span>
                 </div>
               </div>
             ))}
             {!loading && searchFilteredResults.length === 0 && (
-              <div className="p-12 text-center text-muted-foreground text-sm italic">
-                No matching records found for {activeFilter}
+              <div className="p-12 text-center text-slate-400 text-xs italic">
+                No matching records found
               </div>
             )}
           </div>
-          <div className="p-4 bg-slate-50/50 border-t flex items-center justify-between">
-            <p className="text-[10px] font-bold text-slate-400">Showing {searchFilteredResults.length} entries</p>
-          </div>
         </Card>
       </main>
-
-      <Button className="fixed bottom-20 right-6 h-14 w-14 bg-[#006600] hover:bg-[#004d00] text-white rounded-full shadow-2xl flex items-center justify-center transition-transform hover:scale-110 active:scale-95 z-40">
-        <Plus className="h-7 w-7" />
-      </Button>
 
       <BottomNav />
     </div>
