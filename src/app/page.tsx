@@ -24,10 +24,11 @@ export default function LoginPage() {
     if (profileComplete === false) {
       router.replace("/complete-profile");
     } else if (role === "admin") {
-      router.replace("/admin");
+      router.replace("/admin");  // Admin goes to /admin
     } else if (role === "user") {
-      router.replace("/dashboard");
+      router.replace("/dashboard"); // User goes to /dashboard
     }
+    // If role is null, keep waiting
   }, [user, role, profileComplete, loading, router]);
 
   const handleIdLogin = async (e: React.FormEvent) => {
