@@ -66,11 +66,72 @@ export default function QuickCheckIn() {
   return (
     <div className="flex flex-col min-h-screen bg-[#f5f8f5] items-center justify-center md:p-8">
       {showSuccess && (
-        <div className="fixed inset-0 bg-[#006600] flex flex-col items-center justify-center z-[100] text-white animate-in zoom-in duration-300">
-          <div className="text-8xl mb-6">✅</div>
-          <h2 className="text-3xl font-bold mb-2">Visit Logged!</h2>
-          <p className="text-green-100 text-lg">Thank you, {userData?.displayName}!</p>
-          <div className="mt-8 flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin text-[#D4AF37]" /><p className="text-[#D4AF37] text-xs font-bold uppercase">Returning to login...</p></div>
+        <div className="fixed inset-0 bg-[#006600] flex flex-col items-center justify-center z-50 text-white px-8">
+          {/* NEU Seal */}
+          <img 
+            src="/neu-seal.png" 
+            alt="NEU Seal"
+            className="w-20 h-20 object-contain mb-6 animate-bounce"
+          />
+
+          {/* Welcome Message */}
+          <h1 className="text-3xl md:text-4xl font-extrabold text-center mb-2">
+            Welcome to NEU Library!
+          </h1>
+
+          {/* Gold divider */}
+          <div className="w-24 h-1 bg-[#D4AF37] rounded mb-6"/>
+
+          {/* Checkmark */}
+          <div className="text-6xl mb-4">✅</div>
+
+          {/* Visit Logged */}
+          <h2 className="text-xl font-bold mb-2">
+            Visit Logged Successfully!
+          </h2>
+
+          {/* User name */}
+          <p className="text-green-200 text-lg text-center">
+            Thank you, {userData?.displayName}!
+          </p>
+
+          {/* Program */}
+          <p className="text-green-300 text-sm text-center mt-1">
+            {userData?.program}
+          </p>
+
+          {/* Divider */}
+          <div className="w-32 h-px bg-green-500 my-6"/>
+
+          {/* Date and Time */}
+          <p className="text-green-200 text-sm">
+            {new Date().toLocaleDateString("en-US", {
+              weekday: "long",
+              year: "numeric", 
+              month: "long", 
+              day: "numeric"
+            })}
+          </p>
+          <p className="text-green-300 text-xs mt-1">
+            {new Date().toLocaleTimeString("en-US", {
+              hour: "2-digit",
+              minute: "2-digit"
+            })}
+          </p>
+
+          {/* Returning to login */}
+          <div className="flex items-center gap-2 mt-8">
+            <div className="animate-spin rounded-full h-4 w-4 border-2 border-[#D4AF37] border-t-transparent">
+            </div>
+            <p className="text-[#D4AF37] text-xs uppercase tracking-widest font-semibold">
+              Returning to Login...
+            </p>
+          </div>
+
+          {/* Footer */}
+          <p className="absolute bottom-6 text-green-400 text-[10px] uppercase tracking-widest">
+            NEU Library Management System • 2024
+          </p>
         </div>
       )}
 
