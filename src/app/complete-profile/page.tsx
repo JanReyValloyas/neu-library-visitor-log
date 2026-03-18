@@ -15,31 +15,178 @@ import { cn } from "@/lib/utils";
 
 const NEU_DATA = {
   "College Student": [
-    { college: "College of Accountancy", programs: ["Accountancy", "Accounting Information System"] },
-    { college: "College of Agriculture", programs: ["Agriculture"] },
-    { college: "College of Arts and Sciences", programs: ["Economics", "Political Science", "Biology", "Psychology", "Public Administration"] },
-    { college: "College of Business Administration", programs: ["Financial Management", "Human Resource Development Management", "Legal Management", "Marketing Management", "Entrepreneurship", "Real Estate Management"] },
-    { college: "College of Communication", programs: ["Communication"] },
-    { college: "College of Informatics and Computing Studies", programs: ["Computing Studies"] },
-    { college: "College of Criminology", programs: ["Criminology"] },
-    { college: "College of Education", programs: ["Secondary Education", "Elementary Education", "Teacher Education"] },
-    { college: "College of Engineering and Architecture", programs: ["Civil Engineering", "Electronics Engineering", "Electrical Engineering", "Industrial Engineering", "Mechanical Engineering", "Architecture", "BS Astronomy"] },
-    { college: "College of Law", programs: ["Law"] },
-    { college: "College of Medical Technology", programs: ["Medical Technology"] },
-    { college: "College of Medicine", programs: ["Medicine"] },
-    { college: "College of Midwifery", programs: ["Midwifery"] },
-    { college: "College of Music", programs: ["Music"] },
-    { college: "College of Nursing", programs: ["Nursing"] },
-    { college: "College of Physical Therapy", programs: ["Physical Therapy"] },
-    { college: "College of Respiratory Therapy", programs: ["Respiratory Therapy"] },
-    { college: "School of International Relations", programs: ["International Relations"] },
-    { college: "School of Graduate Studies", programs: ["Graduate Studies"] },
-    { college: "NEUVLE +5", programs: ["NEUVLE"] },
+    { 
+      college: "College of Accountancy", 
+      programs: [
+        "BS-Accountancy",
+        "BS-Accounting Information System"
+      ] 
+    },
+    { 
+      college: "College of Agriculture", 
+      programs: [
+        "BS-Agriculture"
+      ] 
+    },
+    { 
+      college: "College of Arts and Sciences", 
+      programs: [
+        "BA-Economics",
+        "BS-Psychology",
+        "BA-Public Administration",
+        "BS-Biology",
+        "AB-Political Science"
+      ] 
+    },
+    { 
+      college: "College of Business Administration", 
+      programs: [
+        "BS-Real Estate Management",
+        "BSBA-Marketing Management",
+        "BSBA-Human Resource Development and Management",
+        "BSBA-Legal Management",
+        "BS-Entrepreneurship",
+        "BSBA-Financial Management"
+      ] 
+    },
+    { 
+      college: "College of Communication", 
+      programs: [
+        "BA-Communication",
+        "BA-Broadcasting",
+        "BA-Journalism"
+      ] 
+    },
+    { 
+      college: "College of Informatics and Computing Studies", 
+      programs: [
+        "Bachelor of Library Information Science",
+        "BS-Information Technology",
+        "BS-Information Systems",
+        "BSEMC-Game Development",
+        "BSEMC-Digital Animation",
+        "BS-Computer Science"
+      ] 
+    },
+    { 
+      college: "College of Criminology", 
+      programs: [
+        "BS-Criminology"
+      ] 
+    },
+    { 
+      college: "College of Education", 
+      programs: [
+        "BSEd-Filipino",
+        "BSEd-Mathematics",
+        "BSEd-Biological Sciences",
+        "BSEd-Physical Sciences",
+        "BEEd-General Sciences",
+        "BEEd-Special Education",
+        "BEEd-Content Courses",
+        "BSEd-Technology and Livelihood Education",
+        "BSEd-MAPE",
+        "BEEd-Pre-School Education",
+        "BSEd-English",
+        "BSEd-Social Studies"
+      ] 
+    },
+    { 
+      college: "College of Engineering and Architecture", 
+      programs: [
+        "BS-Astronomy",
+        "BS-Industrial Engineering",
+        "BS-Mechanical Engineering",
+        "BS-Architecture",
+        "BS-Electronics Engineering",
+        "BS-Electrical Engineering",
+        "BS-Civil Engineering"
+      ] 
+    },
+    { 
+      college: "School of International Relations", 
+      programs: [
+        "BA-Foreign Service"
+      ] 
+    },
+    { 
+      college: "College of Law", 
+      programs: [
+        "Law"
+      ] 
+    },
+    { 
+      college: "College of Medical Technology", 
+      programs: [
+        "BS-Medical Technology"
+      ] 
+    },
+    { 
+      college: "College of Medicine", 
+      programs: [
+        "Medicine"
+      ] 
+    },
+    { 
+      college: "College of Midwifery", 
+      programs: [
+        "BS-Midwifery"
+      ] 
+    },
+    { 
+      college: "College of Music", 
+      programs: [
+        "Music Preparatory and Extended Studies",
+        "BM-Choral Conducting",
+        "BM-Piano",
+        "BM-Voice",
+        "BM-Music Education"
+      ] 
+    },
+    { 
+      college: "College of Nursing", 
+      programs: [
+        "BS-Nursing"
+      ] 
+    },
+    { 
+      college: "College of Physical Therapy", 
+      programs: [
+        "BS-Physical Therapy"
+      ] 
+    },
+    { 
+      college: "College of Respiratory Therapy", 
+      programs: [
+        "BS-Respiratory Therapy"
+      ] 
+    },
+    { 
+      college: "School of Graduate Studies", 
+      programs: [
+        "Graduate Studies"
+      ] 
+    },
+    { 
+      college: "NEUVLE +5", 
+      programs: [
+        "NEUVLE"
+      ] 
+    },
   ],
   "IS Student": [
-    { college: "Integrated School - Academic Track", programs: ["GAS", "STEM", "ABM", "HUMSS"] },
-    { college: "Integrated School - TVL Track", programs: ["ICT", "Home Economics"] },
-    { college: "Integrated School - Arts and Design Track", programs: ["Media/Visual Arts", "Literary/Theater Arts", "Music"] },
+    { 
+      college: "Integrated School - Academic Track", 
+      programs: ["GAS", "STEM", "ABM", "HUMSS"] 
+    },
+    { 
+      college: "Integrated School - TVL Track", 
+      programs: ["ICT", "Home Economics"] 
+    },
+    { 
+      college: "Integrated School - Arts and Design Track", 
+      programs: ["Media/Visual Arts", "Literary/Theater Arts", "Music"] 
+    },
   ],
   "Faculty": [
     { college: "College of Accountancy", programs: ["Teacher", "Staff"] },
