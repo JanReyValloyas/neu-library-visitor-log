@@ -13,7 +13,8 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   LogOut, User as UserIcon, Settings as SettingsIcon, 
-  Library, Clock, ShieldCheck, ChevronRight, Loader2, Save
+  Library, Clock, ShieldCheck, ChevronRight, Loader2, Save,
+  ChevronDown, ChevronUp, Settings2
 } from "lucide-react";
 import { BottomNav } from "@/components/admin/bottom-nav";
 import { toast } from "@/hooks/use-toast";
@@ -26,6 +27,7 @@ export default function AdminSettings() {
   const [libraryName, setLibraryName] = useState("NEU Main Library");
   const [libraryHours, setLibraryHours] = useState("7:00 AM - 9:00 PM");
   const [isSaving, setIsSaving] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   useEffect(() => {
     if (!authLoading && (!user || role !== 'admin')) {
@@ -157,10 +159,81 @@ export default function AdminSettings() {
                   />
                 </div>
               </div>
-              <Button variant="outline" className="w-full border-slate-200 h-11 rounded-xl font-bold uppercase tracking-wider text-xs flex items-center justify-between group">
-                Advanced Settings
-                <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-[#006600] transition-colors" />
-              </Button>
+              
+              <div className="space-y-2 pt-2">
+                <button
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                  className="w-full flex items-center justify-between p-4 border border-slate-200 rounded-xl hover:border-[#006600] transition group bg-white"
+                >
+                  <div className="flex items-center gap-2">
+                    <Settings2 className="h-5 w-5 text-[#006600]" />
+                    <span className="font-bold text-xs uppercase tracking-wider text-slate-700">
+                      Advanced Settings
+                    </span>
+                  </div>
+                  {showAdvanced ? (
+                    <ChevronUp className="h-5 w-5 text-slate-400 group-hover:text-[#006600]" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5 text-slate-400 group-hover:text-[#006600]" />
+                  )}
+                </button>
+
+                {showAdvanced && (
+                  <div className="border border-slate-200 rounded-xl p-4 space-y-5 mt-2 bg-slate-50/30 animate-in slide-in-from-top-2 duration-200">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                        Max Visitors Per Day
+                      </label>
+                      <input 
+                        type="number"
+                        defaultValue={500}
+                        className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#006600] text-sm font-medium bg-white"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">
+                        Require Student ID for Check-in
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <label className="relative flex h-6 w-11 cursor-pointer items-center rounded-full bg-slate-200 p-0.5 transition-colors has-[:checked]:bg-[#006600]">
+                          <input type="checkbox" className="peer invisible absolute" defaultChecked />
+                          <div className="h-5 w-5 rounded-full bg-white shadow-md transform transition-transform duration-200 peer-checked:translate-x-5"></div>
+                        </label>
+                        <span className="text-xs font-bold text-slate-600 uppercase tracking-tight">Enabled</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">
+                        Auto Sign-out After Check-in
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <label className="relative flex h-6 w-11 cursor-pointer items-center rounded-full bg-slate-200 p-0.5 transition-colors has-[:checked]:bg-[#006600]">
+                          <input type="checkbox" defaultChecked className="peer invisible absolute"/>
+                          <div className="h-5 w-5 rounded-full bg-white shadow-md transform transition-transform duration-200 peer-checked:translate-x-5"></div>
+                        </label>
+                        <span className="text-xs font-bold text-slate-600 uppercase tracking-tight">Enabled</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                        Allowed Email Domain
+                      </label>
+                      <input 
+                        type="text"
+                        defaultValue="neu.edu.ph"
+                        className="w-full border border-slate-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#006600] text-sm font-medium bg-white"
+                      />
+                    </div>
+
+                    <button className="w-full bg-[#006600] text-white py-3 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-green-800 transition shadow-md mt-2">
+                      Save Advanced Settings
+                    </button>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>
