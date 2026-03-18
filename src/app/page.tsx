@@ -1,3 +1,4 @@
+
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -17,14 +18,15 @@ export default function LoginPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!loading && user) {
-      if (profileComplete === false) {
-        router.replace("/complete-profile");
-      } else if (role === "admin") {
-        router.replace("/admin");
-      } else {
-        router.replace("/dashboard");
-      }
+    if (loading) return; // Wait for auth + firestore
+    if (!user) return;   // Not logged in, stay on page
+    
+    if (profileComplete === false) {
+      router.replace("/complete-profile");
+    } else if (role === "admin") {
+      router.replace("/admin");
+    } else if (role === "user") {
+      router.replace("/dashboard");
     }
   }, [user, role, profileComplete, loading, router]);
 
@@ -63,7 +65,6 @@ export default function LoginPage() {
         return;
       }
 
-      // Success: Store FULL profile from Firestore to link with their existing account
       sessionStorage.setItem("quickVisitUser", JSON.stringify({
         uid: userData.uid,
         email: userData.email,
@@ -98,12 +99,12 @@ export default function LoginPage() {
     }
   };
 
-  if (loading || (user && profileComplete !== null)) {
+  if (loading || (user && !role)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f5f8f5]">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-10 w-10 animate-spin text-[#006600]" />
-          <p className="text-muted-foreground font-bold text-xs uppercase tracking-widest">Verifying Identity...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#006600] border-t-transparent"></div>
+          <p className="text-[#006600] font-medium">Loading...</p>
         </div>
       </div>
     );

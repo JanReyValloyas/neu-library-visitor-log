@@ -14,6 +14,7 @@ export function useAuth() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setLoading(true);
       if (firebaseUser) {
         setUser(firebaseUser);
         try {
@@ -27,12 +28,11 @@ export function useAuth() {
               setRole(null);
               setProfile(null);
               setProfileComplete(null);
-              setLoading(false);
-              return;
+            } else {
+              setProfile(data);
+              setRole(data.role ?? "user");
+              setProfileComplete(data.profileComplete === true);
             }
-            setProfile(data);
-            setRole(data.role ?? "user");
-            setProfileComplete(data.profileComplete === true);
           } else {
             const newProfile = {
               uid: firebaseUser.uid,
