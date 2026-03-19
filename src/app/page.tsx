@@ -5,7 +5,7 @@ import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 import { auth, db } from "@/firebase/index";
 import { useAuth } from "@/hooks/useAuth";
 import { collection, query, where, getDocs, limit, doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
-import { Loader2, UserCircle, ShieldCheck, User } from "lucide-react";
+import { Loader2, UserCircle, ShieldCheck } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 export default function LoginPage() {
@@ -93,8 +93,7 @@ export default function LoginPage() {
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ 
-        prompt: "select_account",
-        hd: "neu.edu.ph"
+        prompt: "select_account" 
       });
       const result = await signInWithPopup(auth, provider);
       const userRef = doc(db, "users", result.user.uid);
@@ -125,6 +124,7 @@ export default function LoginPage() {
         router.replace("/complete-profile");
         return;
       }
+      // Always redirect to dashboard for visitor path
       router.replace("/dashboard");
     } catch (err: any) {
       setError(err.message);

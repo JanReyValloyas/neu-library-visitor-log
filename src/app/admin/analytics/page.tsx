@@ -11,7 +11,7 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, TrendingUp, Users, Calendar, LayoutDashboard, Settings, Monitor } from "lucide-react";
+import { Loader2, ArrowLeft, TrendingUp, Users, Calendar, LayoutDashboard, Settings } from "lucide-react";
 import { BottomNav } from "@/components/admin/bottom-nav";
 import { format, subDays, startOfDay } from "date-fns";
 import Link from "next/link";
@@ -101,7 +101,6 @@ export default function AdminAnalytics() {
     { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
     { name: "Users", href: "/admin/users", icon: Users },
     { name: "Analytics", href: "/admin/analytics", icon: Calendar },
-    { name: "Kiosk Mode", href: "/admin/kiosk", icon: Monitor },
     { name: "Settings", href: "/admin/settings", icon: Settings },
   ];
 

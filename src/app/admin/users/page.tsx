@@ -24,8 +24,7 @@ import {
   LayoutDashboard,
   Users,
   BarChart,
-  Settings,
-  Monitor
+  Settings
 } from "lucide-react";
 import { BottomNav } from "@/components/admin/bottom-nav";
 import { Badge } from "@/components/ui/badge";
@@ -101,7 +100,6 @@ export default function UsersManagement() {
     { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
     { name: "Users", href: "/admin/users", icon: Users },
     { name: "Analytics", href: "/admin/analytics", icon: BarChart },
-    { name: "Kiosk Mode", href: "/admin/kiosk", icon: Monitor },
     { name: "Settings", href: "/admin/settings", icon: Settings },
   ];
 

@@ -27,8 +27,7 @@ import {
   CalendarDays,
   LayoutDashboard,
   BarChart,
-  Settings,
-  Monitor
+  Settings
 } from "lucide-react";
 import { BottomNav } from "@/components/admin/bottom-nav";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
@@ -279,7 +278,6 @@ export default function AdminDashboard() {
     { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
     { name: "Users", href: "/admin/users", icon: Users },
     { name: "Analytics", href: "/admin/analytics", icon: BarChart },
-    { name: "Kiosk Mode", href: "/admin/kiosk", icon: Monitor },
     { name: "Settings", href: "/admin/settings", icon: Settings },
   ];
 
@@ -314,9 +312,6 @@ export default function AdminDashboard() {
             <p className="text-xs text-slate-400 font-medium">Real-time overview of library activities</p>
           </div>
           <div className="flex items-center gap-2">
-            <Link href="/admin/kiosk" className="hidden lg:flex items-center gap-2 bg-[#D4AF37] text-white px-4 py-2 rounded-lg font-bold text-[10px] uppercase tracking-widest hover:bg-[#b8952d] transition-all shadow-md">
-              <Monitor className="h-3 w-3" /> Launch Kiosk
-            </Link>
             <div className="relative">
               <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full" onClick={() => setShowNotifications(!showNotifications)}>
                 <Bell className="h-5 w-5 text-slate-600" />
