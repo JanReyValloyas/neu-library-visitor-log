@@ -27,7 +27,8 @@ import {
   CalendarDays,
   LayoutDashboard,
   BarChart,
-  Settings
+  Settings,
+  Monitor
 } from "lucide-react";
 import { BottomNav } from "@/components/admin/bottom-nav";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
@@ -54,7 +55,6 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const pathname = usePathname();
   
-  // Stats state
   const [todayCount, setTodayCount] = useState(0);
   const [weekCount, setWeekCount] = useState(0);
   const [monthCount, setMonthCount] = useState(0);
@@ -62,8 +62,6 @@ export default function AdminDashboard() {
   const [peakHour, setPeakHour] = useState("Loading...");
   const [chartData, setChartData] = useState<any[]>([]);
   const [activeFilter, setActiveFilter] = useState("Today");
-
-  // Notifications state
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
 
@@ -248,7 +246,7 @@ export default function AdminDashboard() {
         v.college || "N/A",
         v.reason || "N/A",
         v.date || "N/A",
-        v.timestamp?.toDate?.().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) || "N/A",
+        v.timestamp?.toDate?.()?.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) || "N/A",
       ]),
       headStyles: { fillColor: [0, 102, 0], textColor: [255, 255, 255], fontStyle: "bold" },
       alternateRowStyles: { fillColor: [245, 248, 245] },
@@ -281,12 +279,12 @@ export default function AdminDashboard() {
     { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
     { name: "Users", href: "/admin/users", icon: Users },
     { name: "Analytics", href: "/admin/analytics", icon: BarChart },
+    { name: "Kiosk Mode", href: "/admin/kiosk", icon: Monitor },
     { name: "Settings", href: "/admin/settings", icon: Settings },
   ];
 
   return (
     <div className="flex flex-col min-h-screen bg-[#f5f8f5]">
-      {/* Desktop Sidebar */}
       <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 bg-white border-r border-primary/10 pt-6 z-20">
         <div className="px-6 mb-8 flex items-center gap-3">
           <div className="w-10 h-10 bg-[#006600] rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-md">NEU</div>
@@ -316,6 +314,9 @@ export default function AdminDashboard() {
             <p className="text-xs text-slate-400 font-medium">Real-time overview of library activities</p>
           </div>
           <div className="flex items-center gap-2">
+            <Link href="/admin/kiosk" className="hidden lg:flex items-center gap-2 bg-[#D4AF37] text-white px-4 py-2 rounded-lg font-bold text-[10px] uppercase tracking-widest hover:bg-[#b8952d] transition-all shadow-md">
+              <Monitor className="h-3 w-3" /> Launch Kiosk
+            </Link>
             <div className="relative">
               <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full" onClick={() => setShowNotifications(!showNotifications)}>
                 <Bell className="h-5 w-5 text-slate-600" />

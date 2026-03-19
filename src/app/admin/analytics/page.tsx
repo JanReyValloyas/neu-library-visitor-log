@@ -11,7 +11,7 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, TrendingUp, Users, Calendar, LayoutDashboard, Settings } from "lucide-react";
+import { Loader2, ArrowLeft, TrendingUp, Users, Calendar, LayoutDashboard, Settings, Monitor } from "lucide-react";
 import { BottomNav } from "@/components/admin/bottom-nav";
 import { format, subDays, startOfDay } from "date-fns";
 import Link from "next/link";
@@ -101,12 +101,12 @@ export default function AdminAnalytics() {
     { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
     { name: "Users", href: "/admin/users", icon: Users },
     { name: "Analytics", href: "/admin/analytics", icon: Calendar },
+    { name: "Kiosk Mode", href: "/admin/kiosk", icon: Monitor },
     { name: "Settings", href: "/admin/settings", icon: Settings },
   ];
 
   return (
     <div className="flex flex-col min-h-screen bg-[#f5f8f5]">
-      {/* Desktop Sidebar */}
       <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 bg-white border-r border-primary/10 pt-6 z-20">
         <div className="px-6 mb-8 flex items-center gap-3">
           <div className="w-10 h-10 bg-[#006600] rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-md">NEU</div>
@@ -114,7 +114,7 @@ export default function AdminAnalytics() {
         </div>
         <nav className="flex-1 px-4 space-y-1">
           {navItems.map((item) => (
-            <Link key={item.name} href={item.href} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-xs uppercase ${pathname === item.href ? 'bg-[#006600] text-white' : 'text-slate-500'}`}><item.icon className="h-4 w-4" />{item.name}</Link>
+            <Link key={item.name} href={item.href} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-xs uppercase ${pathname === item.href ? 'bg-[#006600] text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}><item.icon className="h-4 w-4" />{item.name}</Link>
           ))}
         </nav>
       </aside>

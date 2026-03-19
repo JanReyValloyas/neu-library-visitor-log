@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Switch } from "@/components/ui/switch";
 import { 
   LogOut, 
   User as UserIcon, 
@@ -32,7 +33,8 @@ import {
   LayoutDashboard,
   Users,
   BarChart,
-  Settings
+  Settings,
+  Monitor
 } from "lucide-react";
 import { BottomNav } from "@/components/admin/bottom-nav";
 import { toast } from "@/hooks/use-toast";
@@ -171,12 +173,12 @@ export default function AdminSettings() {
     { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
     { name: "Users", href: "/admin/users", icon: Users },
     { name: "Analytics", href: "/admin/analytics", icon: BarChart },
+    { name: "Kiosk Mode", href: "/admin/kiosk", icon: Monitor },
     { name: "Settings", href: "/admin/settings", icon: Settings },
   ];
 
   return (
     <div className="flex flex-col min-h-screen bg-[#f5f8f5]">
-      {/* Desktop Sidebar */}
       <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 bg-white border-r border-primary/10 pt-6 z-20">
         <div className="px-6 mb-8 flex items-center gap-3">
           <div className="w-10 h-10 bg-[#006600] rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-md">NEU</div>
