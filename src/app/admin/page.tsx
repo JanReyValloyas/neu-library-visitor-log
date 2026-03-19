@@ -28,7 +28,9 @@ import {
   CalendarDays,
   LayoutDashboard,
   BarChart,
-  Settings
+  Settings,
+  X,
+  SearchX
 } from "lucide-react";
 import { BottomNav } from "@/components/admin/bottom-nav";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
@@ -46,13 +48,15 @@ interface Visit {
   date: string;
   timestamp: any;
   email?: string;
+  studentId?: string;
+  visitorType?: string;
 }
 
 export default function AdminDashboard() {
   const { user, role, loading: authLoading } = useAuth();
   const router = useRouter();
   const [filteredVisits, setFilteredVisits] = useState<Visit[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const pathname = usePathname();
   
@@ -273,11 +277,19 @@ export default function AdminDashboard() {
     doc.save(`NEU-Library-Visitors-${activeFilter}-${format(new Date(), "yyyy-MM-dd")}.pdf`);
   };
 
-  const searchFilteredResults = filteredVisits.filter(v => 
-    v.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    v.program?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    v.reason?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredRecords = filteredVisits.filter((visit: any) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    return (
+      visit.displayName?.toLowerCase().includes(q) ||
+      visit.studentId?.toLowerCase().includes(q) ||
+      visit.college?.toLowerCase().includes(q) ||
+      visit.program?.toLowerCase().includes(q) ||
+      visit.reason?.toLowerCase().includes(q) ||
+      visit.email?.toLowerCase().includes(q) ||
+      visit.visitorType?.toLowerCase().includes(q)
+    );
+  });
 
   const getInitials = (name: string) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : "??";
 
@@ -403,24 +415,57 @@ export default function AdminDashboard() {
                     <button key={f} onClick={() => handleFilterChange(f)} className={activeFilter === f ? "bg-[#006600] text-white px-4 py-2 rounded-xl text-[10px] font-bold shadow-md transition-all uppercase" : "bg-white border border-slate-200 text-slate-500 px-4 py-2 rounded-xl text-[10px] font-bold hover:bg-slate-50 transition-all uppercase"}>{f}</button>
                   ))}
                 </div>
-                <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Search records..." className="pl-10 h-12 bg-white border-slate-200 rounded-xl" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
                 <Button onClick={handleExportPDF} className="w-full h-12 bg-[#D4AF37] hover:bg-[#c5a02d] text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 uppercase tracking-wider text-xs"><Printer className="h-4 w-4" /> Export PDF</Button>
               </div>
             </div>
           </div>
 
           <Card className="rounded-2xl border-none shadow-md overflow-hidden bg-white">
-            <div className="p-4 border-b bg-slate-50/50 flex justify-between items-center"><h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{activeFilter} Records</h3><Badge variant="outline" className="text-[9px] font-bold text-slate-400 bg-white border-slate-200">{searchFilteredResults.length} Entries</Badge></div>
+            <div className="p-4 border-b bg-slate-50/50 flex justify-between items-center">
+              <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{activeFilter} Records</h3>
+              <Badge variant="outline" className="text-[9px] font-bold text-slate-400 bg-white border-slate-200">
+                {filteredRecords.length} {searchQuery ? "Results" : "Entries"}
+              </Badge>
+            </div>
+            
+            <div className="px-4 py-3 border-b">
+              <div className="flex items-center gap-2 border border-slate-200 rounded-xl bg-white px-4 py-2 focus-within:border-[#006600] transition-colors">
+                <Search className="h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search name, ID, college, program, reason..."
+                  className="flex-1 text-sm text-slate-700 bg-transparent focus:outline-none placeholder:text-slate-400"
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery("")} className="text-slate-400 hover:text-slate-600">
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
             <div className="overflow-x-auto">
               <div className="divide-y divide-slate-100 min-w-[600px]">
-                {loading ? <div className="p-12 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-[#006600]" /></div> : searchFilteredResults.map((visit) => (
-                  <div key={visit.id} className="p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
-                    <div className="h-10 w-10 bg-[#006600]/5 rounded-xl flex items-center justify-center text-[#006600] font-bold text-xs shrink-0">{getInitials(visit.displayName)}</div>
-                    <div className="flex-1 min-w-0"><p className="font-bold text-sm text-slate-800 truncate">{visit.displayName || "Unknown"}</p><p className="text-[10px] text-[#006600] font-bold uppercase tracking-tight">{visit.program || "GENERAL"}</p></div>
-                    <div className="flex-1 hidden md:block"><p className="text-[10px] font-bold text-slate-500 uppercase">{visit.college || "N/A"}</p></div>
-                    <div className="flex flex-col items-end gap-1 shrink-0"><Badge variant="outline" className="text-[9px] font-bold text-slate-500 border-slate-200 rounded-lg uppercase">{visit.reason ? visit.reason.split(',')[0] : "OTHER"}</Badge><span className="text-[9px] text-slate-400 font-bold">{visit.timestamp?.toDate?.() ? format(visit.timestamp.toDate(), "h:mm a") : "N/A"}</span></div>
+                {loading ? (
+                  <div className="p-12 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-[#006600]" /></div>
+                ) : filteredRecords.length > 0 ? (
+                  filteredRecords.map((visit) => (
+                    <div key={visit.id} className="p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
+                      <div className="h-10 w-10 bg-[#006600]/5 rounded-xl flex items-center justify-center text-[#006600] font-bold text-xs shrink-0">{getInitials(visit.displayName)}</div>
+                      <div className="flex-1 min-w-0"><p className="font-bold text-sm text-slate-800 truncate">{visit.displayName || "Unknown"}</p><p className="text-[10px] text-[#006600] font-bold uppercase tracking-tight">{visit.program || "GENERAL"}</p></div>
+                      <div className="flex-1 hidden md:block"><p className="text-[10px] font-bold text-slate-500 uppercase">{visit.college || "N/A"}</p></div>
+                      <div className="flex flex-col items-end gap-1 shrink-0"><Badge variant="outline" className="text-[9px] font-bold text-slate-500 border-slate-200 rounded-lg uppercase">{visit.reason ? visit.reason.split(',')[0] : "OTHER"}</Badge><span className="text-[9px] text-slate-400 font-bold">{visit.timestamp?.toDate?.() ? format(visit.timestamp.toDate(), "h:mm a") : "N/A"}</span></div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-12 text-slate-400">
+                    <SearchX className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                    <p className="text-sm font-medium">No results found for "{searchQuery}"</p>
+                    <p className="text-xs mt-1">Try searching by name, ID, college, program or reason</p>
                   </div>
-                ))}
+                )}
               </div>
             </div>
           </Card>
