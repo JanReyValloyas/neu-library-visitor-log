@@ -1,3 +1,4 @@
+
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -20,9 +21,11 @@ export default function LoginPage() {
     if (loading) return;
     if (!user) return;
     
-    if (role === "admin") {
+    const storedSession = sessionStorage.getItem("sessionType");
+    
+    if (role === "admin" && storedSession === "admin") {
       router.replace("/admin");
-    } else if (role === "user") {
+    } else if (user) {
       if (profileComplete === false) {
         router.replace("/complete-profile");
       } else {
@@ -66,6 +69,7 @@ export default function LoginPage() {
         return;
       }
 
+      sessionStorage.setItem("sessionType", "visitor");
       sessionStorage.setItem("quickVisitUser", JSON.stringify({
         uid: userData.uid,
         email: userData.email,
@@ -99,6 +103,8 @@ export default function LoginPage() {
       const userRef = doc(db, "users", result.user.uid);
       const userSnap = await getDoc(userRef);
       
+      sessionStorage.setItem("sessionType", "visitor");
+
       if (!userSnap.exists()) {
         await setDoc(userRef, {
           uid: result.user.uid,
@@ -124,7 +130,6 @@ export default function LoginPage() {
         router.replace("/complete-profile");
         return;
       }
-      // Always redirect to dashboard for visitor path
       router.replace("/dashboard");
     } catch (err: any) {
       setError(err.message);
@@ -157,6 +162,8 @@ export default function LoginPage() {
         setError("Access denied. You are not an admin.");
         return;
       }
+
+      sessionStorage.setItem("sessionType", "admin");
       router.replace("/admin");
     } catch (err: any) {
       setError(err.message);

@@ -1,7 +1,7 @@
 
 "use client";
 import { useState, useEffect } from "react";
-import { onAuthStateChanged, User } from "firebase/auth";
+import { onAuthStateChanged, User, signOut } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "@/firebase/index";
 
@@ -10,9 +10,18 @@ export function useAuth() {
   const [role, setRole] = useState<string | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
   const [profileComplete, setProfileComplete] = useState<boolean | null>(null);
+  const [sessionType, setSessionType] = useState<"visitor" | "admin" | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Read sessionType from sessionStorage
+    if (typeof window !== 'undefined') {
+      const storedSession = sessionStorage.getItem("sessionType");
+      if (storedSession) {
+        setSessionType(storedSession as "visitor" | "admin");
+      }
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setLoading(true);
       if (firebaseUser) {
@@ -23,11 +32,15 @@ export function useAuth() {
           if (userSnap.exists()) {
             const data = userSnap.data();
             if (data.isBlocked) {
-              await auth.signOut();
+              await signOut(auth);
               setUser(null);
               setRole(null);
               setProfile(null);
               setProfileComplete(null);
+              setSessionType(null);
+              if (typeof window !== 'undefined') {
+                sessionStorage.removeItem("sessionType");
+              }
             } else {
               setProfile(data);
               setRole(data.role ?? "user");
@@ -59,11 +72,15 @@ export function useAuth() {
         setRole(null);
         setProfile(null);
         setProfileComplete(null);
+        setSessionType(null);
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem("sessionType");
+        }
       }
       setLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
-  return { user, role, profile, profileComplete, loading };
+  return { user, role, profile, profileComplete, sessionType, loading };
 }

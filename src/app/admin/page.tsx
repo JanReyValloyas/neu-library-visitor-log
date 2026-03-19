@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -34,7 +35,7 @@ import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 interface Visit {
   id: string;
@@ -49,6 +50,7 @@ interface Visit {
 
 export default function AdminDashboard() {
   const { user, role, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [filteredVisits, setFilteredVisits] = useState<Visit[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
@@ -63,6 +65,23 @@ export default function AdminDashboard() {
   const [activeFilter, setActiveFilter] = useState("Today");
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.replace("/");
+      return;
+    }
+    if (role !== "admin") {
+      router.replace("/dashboard");
+      return;
+    }
+    const sessionType = sessionStorage.getItem("sessionType");
+    if (sessionType !== "admin") {
+      router.replace("/dashboard");
+      return;
+    }
+  }, [user, role, authLoading, router]);
 
   const getTodayRange = () => {
     const start = startOfDay(new Date());
@@ -270,10 +289,6 @@ export default function AdminDashboard() {
     );
   }
 
-  if (!user || role !== 'admin') {
-    return <div className="min-h-screen flex items-center justify-center p-6 text-center">Access Denied</div>;
-  }
-
   const navItems = [
     { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
     { name: "Users", href: "/admin/users", icon: Users },
@@ -332,7 +347,7 @@ export default function AdminDashboard() {
               )}
             </div>
             <Avatar className="h-9 w-9 border-2 border-[#D4AF37]">
-              <AvatarFallback className="bg-slate-100 text-[10px] font-bold">{user.displayName?.charAt(0)}</AvatarFallback>
+              <AvatarFallback className="bg-slate-100 text-[10px] font-bold">{user?.displayName?.charAt(0)}</AvatarFallback>
             </Avatar>
           </div>
         </header>

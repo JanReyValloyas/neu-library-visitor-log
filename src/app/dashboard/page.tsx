@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -55,7 +56,11 @@ export default function Dashboard() {
         yearLevel: profile?.yearLevel || "N/A",
       });
       setShowSuccess(true);
-      setTimeout(async () => { await signOut(auth); router.replace("/"); }, 2000);
+      setTimeout(async () => { 
+        await signOut(auth); 
+        sessionStorage.removeItem("sessionType");
+        router.replace("/"); 
+      }, 2000);
     } catch (error) {
       toast({ title: "Error", variant: "destructive" });
       setIsSubmitting(false);
