@@ -125,6 +125,23 @@ export default function AdminDashboard() {
     return { start, end };
   }
 
+  const getLast7Days = () => {
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      const dateStr = `${year}-${month}-${day}`;
+      const dayName = d.toLocaleDateString("en-US", { 
+        weekday: "short" 
+      });
+      days.push({ dateStr, dayName });
+    }
+    return days;
+  };
+
   useEffect(() => {
     const visitsRef = collection(db, "visits");
     const q = query(visitsRef, orderBy("timestamp", "desc"));
@@ -143,10 +160,13 @@ export default function AdminDashboard() {
     try {
       const visitsRef = collection(db, "visits");
       
-      const { start: todayStart, end: todayEnd } = getTodayRange();
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
       const todayQ = query(visitsRef,
-        where("timestamp", ">=", Timestamp.fromDate(todayStart)),
-        where("timestamp", "<=", Timestamp.fromDate(todayEnd))
+        where("timestamp", ">=", Timestamp.fromDate(startOfToday)),
+        where("timestamp", "<=", Timestamp.fromDate(endOfToday))
       );
       const todaySnap = await getDocs(todayQ);
       setTodayCount(todaySnap.size);
@@ -189,20 +209,15 @@ export default function AdminDashboard() {
         const h12 = h % 12 || 12;
         setPeakHour(`${h12}:00 ${ampm}`);
       } else {
-        setPeakHour("No data yet");
+        setPeakHour("No visits yet");
       }
 
-      const last7Days = Array.from({length: 7}, (_, i) => {
-        const d = subDays(new Date(), 6 - i);
-        return format(d, "yyyy-MM-dd");
-      });
-      
-      const trajectoryData = last7Days.map(dateStr => {
+      const last7Days = getLast7Days();
+      const trajectoryData = last7Days.map(({ dateStr, dayName }) => {
         const count = allSnap.docs.filter(doc => 
           doc.data().date === dateStr
         ).length;
-        const dayName = format(new Date(dateStr), "EEE");
-        return { date: dayName, count };
+        return { date: dayName, count, fullDate: dateStr };
       });
       setChartData(trajectoryData);
 
@@ -288,7 +303,9 @@ export default function AdminDashboard() {
       alternateRowStyles: { fillColor: [245, 248, 245] },
       styles: { fontSize: 8 },
     });
-    doc.save(`NEU-Library-Visitors-${activeFilter}-${format(new Date(), "yyyy-MM-dd")}.pdf`);
+    const now = new Date();
+    const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    doc.save(`NEU-Library-Visitors-${activeFilter}-${localDate}.pdf`);
   };
 
   const filteredRecords = filteredVisits.filter((visit: any) => {

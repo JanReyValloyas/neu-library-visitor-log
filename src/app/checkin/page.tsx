@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -41,6 +42,10 @@ export default function QuickCheckIn() {
     setIsSubmitting(true);
     try {
       const finalReasons = selectedReasons.map(r => r === "Other" ? `Other: ${otherReason}` : r).join(", ");
+      
+      const now = new Date();
+      const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
       await addDoc(collection(db, "visits"), {
         uid: userData.uid,
         email: userData.email,
@@ -51,7 +56,7 @@ export default function QuickCheckIn() {
         isEmployee: userData.visitorType === "Faculty",
         reason: finalReasons,
         timestamp: serverTimestamp(),
-        date: new Date().toISOString().split("T")[0],
+        date: localDate,
         studentId: userData.studentId,
         yearLevel: userData.yearLevel || "N/A"
       });
@@ -73,43 +78,26 @@ export default function QuickCheckIn() {
     <div className="flex flex-col min-h-screen bg-[#f5f8f5] items-center justify-center md:p-8">
       {showSuccess && (
         <div className="fixed inset-0 bg-[#006600] flex flex-col items-center justify-center z-50 text-white px-8">
-          {/* NEU Seal */}
           <img 
             src="/neu-seal.png" 
             alt="NEU Seal"
             className="w-20 h-20 object-contain mb-6 animate-bounce"
           />
-
-          {/* Welcome Message */}
           <h1 className="text-3xl md:text-4xl font-extrabold text-center mb-2">
             Welcome to NEU Library!
           </h1>
-
-          {/* Gold divider */}
           <div className="w-24 h-1 bg-[#D4AF37] rounded mb-6"/>
-
-          {/* Checkmark */}
           <div className="text-6xl mb-4">✅</div>
-
-          {/* Visit Logged */}
           <h2 className="text-xl font-bold mb-2">
             Visit Logged Successfully!
           </h2>
-
-          {/* User name */}
           <p className="text-green-200 text-lg text-center">
             Thank you, {displayName}!
           </p>
-
-          {/* Program */}
           <p className="text-green-300 text-sm text-center mt-1">
             {programName}
           </p>
-
-          {/* Divider */}
           <div className="w-32 h-px bg-green-500 my-6"/>
-
-          {/* Date and Time */}
           <p className="text-green-200 text-sm">
             {new Date().toLocaleDateString("en-US", {
               weekday: "long",
@@ -124,8 +112,6 @@ export default function QuickCheckIn() {
               minute: "2-digit"
             })}
           </p>
-
-          {/* Returning to login */}
           <div className="flex items-center gap-2 mt-8">
             <div className="animate-spin rounded-full h-4 w-4 border-2 border-[#D4AF37] border-t-transparent">
             </div>
@@ -133,8 +119,6 @@ export default function QuickCheckIn() {
               Returning to Login...
             </p>
           </div>
-
-          {/* Footer */}
           <p className="absolute bottom-6 text-green-400 text-[10px] uppercase tracking-widest">
             NEU Library Management System • 2024
           </p>
