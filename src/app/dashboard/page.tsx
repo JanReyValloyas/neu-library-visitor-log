@@ -32,6 +32,14 @@ export default function Dashboard() {
     if (!loading && user && profileComplete === false) router.replace("/complete-profile");
   }, [user, profileComplete, loading, router, showSuccess]);
 
+  const handleBack = async () => {
+    await signOut(auth);
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem("sessionType");
+    }
+    router.replace("/");
+  };
+
   const handleToggleReason = (reason: string) => {
     setSelectedReasons(prev => prev.includes(reason) ? prev.filter(r => r !== reason) : [...prev, reason]);
   };
@@ -58,7 +66,9 @@ export default function Dashboard() {
       setShowSuccess(true);
       setTimeout(async () => { 
         await signOut(auth); 
-        sessionStorage.removeItem("sessionType");
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem("sessionType");
+        }
         router.replace("/"); 
       }, 2000);
     } catch (error) {
@@ -147,7 +157,12 @@ export default function Dashboard() {
       <div className="w-full max-w-md md:max-w-2xl lg:max-w-4xl bg-white md:rounded-3xl md:shadow-2xl overflow-hidden relative pb-32 md:pb-8">
         <header className="p-4 md:p-6 flex items-center justify-between bg-white border-b sticky top-0 z-10">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => router.push('/')} className="h-9 w-9"><ArrowLeft className="h-5 w-5" /></Button>
+            <button
+              onClick={handleBack}
+              className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-primary/10 transition"
+            >
+              <ArrowLeft className="h-6 w-6 text-[#006600]" />
+            </button>
             <div>
               <h1 className="font-bold text-base md:text-xl text-slate-800">Hi, {displayName.split(' ')[0]}!</h1>
               <p className="text-[10px] md:text-xs font-bold text-[#006600] uppercase">{programName || 'User'}</p>
