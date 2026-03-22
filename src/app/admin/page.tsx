@@ -52,6 +52,7 @@ interface Visit {
   email?: string;
   studentId?: string;
   visitorType?: string;
+  yearLevel?: string;
 }
 
 export default function AdminDashboard() {
@@ -72,6 +73,7 @@ export default function AdminDashboard() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -554,7 +556,11 @@ export default function AdminDashboard() {
                   <div className="p-12 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-[#006600]" /></div>
                 ) : filteredRecords.length > 0 ? (
                   filteredRecords.map((visit) => (
-                    <div key={visit.id} className="p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
+                    <div 
+                      key={visit.id} 
+                      onClick={() => setSelectedVisit(visit)}
+                      className="p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors cursor-pointer"
+                    >
                       <div className="h-10 w-10 bg-[#006600]/5 rounded-xl flex items-center justify-center text-[#006600] font-bold text-xs shrink-0">{getInitials(visit.displayName)}</div>
                       <div className="flex-1 min-w-0"><p className="font-bold text-sm text-slate-800 truncate">{visit.displayName || "Unknown"}</p><p className="text-[10px] text-[#006600] font-bold uppercase tracking-tight">{visit.program || "GENERAL"}</p></div>
                       <div className="flex-1 hidden md:block"><p className="text-[10px] font-bold text-slate-500 uppercase">{visit.college || "N/A"}</p></div>
@@ -573,6 +579,88 @@ export default function AdminDashboard() {
           </Card>
         </main>
       </div>
+      
+      {/* Visit Details Modal */}
+      {selectedVisit && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedVisit(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="bg-[#006600] p-4 flex items-center justify-between">
+              <h3 className="text-white font-bold text-lg">Visit Details</h3>
+              <button onClick={() => setSelectedVisit(null)} className="text-white hover:bg-white/10 p-1 rounded-full transition">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Visitor Info */}
+            <div className="p-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-[#006600] text-white flex items-center justify-center text-lg font-bold shrink-0">
+                  {getInitials(selectedVisit.displayName || "?")}
+                </div>
+                <div>
+                  <p className="font-bold text-slate-800">{selectedVisit.displayName || "Unknown"}</p>
+                  <p className="text-xs text-[#006600] font-bold uppercase tracking-tight">{selectedVisit.program || "N/A"}</p>
+                  <p className="text-xs text-slate-500">{selectedVisit.email || "N/A"}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Visit Details Grid */}
+            <div className="p-4 grid grid-cols-2 gap-3">
+              <div className="bg-slate-50 rounded-xl p-3">
+                <p className="text-[10px] text-slate-400 uppercase tracking-wider font-bold mb-1">Student ID</p>
+                <p className="text-sm font-bold text-slate-800">{selectedVisit.studentId || "N/A"}</p>
+              </div>
+
+              <div className="bg-slate-50 rounded-xl p-3">
+                <p className="text-[10px] text-slate-400 uppercase tracking-wider font-bold mb-1">Visitor Type</p>
+                <p className="text-sm font-bold text-slate-800">{selectedVisit.visitorType || "N/A"}</p>
+              </div>
+
+              <div className="bg-slate-50 rounded-xl p-3">
+                <p className="text-[10px] text-slate-400 uppercase tracking-wider font-bold mb-1">College</p>
+                <p className="text-sm font-bold text-slate-800">{selectedVisit.college || "N/A"}</p>
+              </div>
+
+              <div className="bg-slate-50 rounded-xl p-3">
+                <p className="text-[10px] text-slate-400 uppercase tracking-wider font-bold mb-1">Year Level</p>
+                <p className="text-sm font-bold text-slate-800">{selectedVisit.yearLevel || "N/A"}</p>
+              </div>
+
+              <div className="bg-[#006600]/10 rounded-xl p-3 col-span-2">
+                <p className="text-[10px] text-slate-400 uppercase tracking-wider font-bold mb-1">Reason for Visit</p>
+                <p className="text-sm font-bold text-[#006600]">{selectedVisit.reason || "N/A"}</p>
+              </div>
+
+              <div className="bg-slate-50 rounded-xl p-3">
+                <p className="text-[10px] text-slate-400 uppercase tracking-wider font-bold mb-1">Date</p>
+                <p className="text-sm font-bold text-slate-800">{selectedVisit.date || "N/A"}</p>
+              </div>
+
+              <div className="bg-slate-50 rounded-xl p-3">
+                <p className="text-[10px] text-slate-400 uppercase tracking-wider font-bold mb-1">Time</p>
+                <p className="text-sm font-bold text-slate-800">
+                  {selectedVisit.timestamp?.toDate?.()
+                    ? format(selectedVisit.timestamp.toDate(), "h:mm:ss a")
+                    : "N/A"}
+                </p>
+              </div>
+            </div>
+
+            {/* Close Button */}
+            <div className="p-4 pt-0">
+              <button
+                onClick={() => setSelectedVisit(null)}
+                className="w-full py-3 bg-[#006600] text-white rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-green-800 transition shadow-lg"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <BottomNav />
     </div>
   );
