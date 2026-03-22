@@ -49,6 +49,8 @@ export default function UsersManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "blocked">("all");
   const [loading, setLoading] = useState(true);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const pathname = usePathname();
 
   useEffect(() => {
@@ -64,6 +66,20 @@ export default function UsersManagement() {
         setLoading(false);
       }
     );
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!db) return;
+    const visitsRef = collection(db, "visits");
+    const q = query(visitsRef, orderBy("timestamp", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const recent = snapshot.docs.slice(0, 5).map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setNotifications(recent);
+    });
     return () => unsubscribe();
   }, []);
 
@@ -127,8 +143,50 @@ export default function UsersManagement() {
         <header className="p-4 md:p-6 flex items-center justify-between bg-white border-b sticky top-0 z-10">
           <h1 className="font-bold text-lg text-slate-800">User Management</h1>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full"><Bell className="h-5 w-5 text-slate-600" /></Button>
-            <Avatar className="h-9 w-9 border-2 border-[#D4AF37]"><AvatarFallback className="bg-slate-100 text-[10px] font-bold">AD</AvatarFallback></Avatar>
+            <div className="relative">
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/5 text-primary hover:bg-primary/10 transition"
+              >
+                <Bell className="h-5 w-5 text-slate-600" />
+              </button>
+
+              {showNotifications && (
+                <div className="absolute right-0 top-12 w-72 bg-white rounded-xl shadow-2xl border border-slate-100 z-50 overflow-hidden">
+                  <div className="p-3 border-b border-slate-100 flex justify-between items-center">
+                    <h3 className="font-bold text-sm text-[#006600]">Recent Check-ins</h3>
+                    <button 
+                      onClick={() => setShowNotifications(false)}
+                      className="text-slate-400 hover:text-slate-600 text-xs"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="max-h-60 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <p className="text-center text-slate-400 text-sm py-6">No recent check-ins</p>
+                    ) : (
+                      notifications.map((notif: any) => (
+                        <div key={notif.id} className="p-3 border-b border-slate-50 hover:bg-slate-50 transition">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-[#006600] text-white flex items-center justify-center text-xs font-bold shrink-0">
+                              {notif.displayName?.charAt(0) || "?"}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-slate-800 truncate">{notif.displayName || "Unknown"}</p>
+                              <p className="text-xs text-slate-500 truncate">{notif.program} • {notif.reason}</p>
+                              <p className="text-[10px] text-[#006600]">
+                                {notif.timestamp?.toDate?.() ? notif.timestamp.toDate().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : "Just now"}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
