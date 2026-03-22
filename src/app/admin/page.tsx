@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { db } from "@/firebase/index";
+import { db, auth } from "@/firebase/index";
 import { 
   collection, 
   query, 
@@ -13,6 +13,7 @@ import {
   onSnapshot, 
   Timestamp 
 } from "firebase/firestore";
+import { signOut } from "firebase/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -29,7 +30,9 @@ import {
   BarChart,
   Settings,
   X,
-  SearchX
+  SearchX,
+  LogOut,
+  User as UserIcon
 } from "lucide-react";
 import { BottomNav } from "@/components/admin/bottom-nav";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
@@ -68,6 +71,7 @@ export default function AdminDashboard() {
   const [activeFilter, setActiveFilter] = useState("Today");
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -85,6 +89,17 @@ export default function AdminDashboard() {
       return;
     }
   }, [user, role, authLoading, router]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(".profile-menu-container")) {
+        setShowProfileMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const getTodayRange = () => {
     const start = startOfDay(new Date());
@@ -357,9 +372,80 @@ export default function AdminDashboard() {
                 </div>
               )}
             </div>
-            <Avatar className="h-9 w-9 border-2 border-[#D4AF37]">
-              <AvatarFallback className="bg-slate-100 text-[10px] font-bold">{user?.displayName?.charAt(0)}</AvatarFallback>
-            </Avatar>
+            
+            <div className="profile-menu-container relative">
+              <button
+                onClick={() => setShowProfileMenu(!showProfileMenu)}
+                className="w-9 h-9 rounded-full bg-white border-2 border-[#006600] flex items-center justify-center font-bold text-[#006600] text-sm hover:bg-[#006600] hover:text-white transition cursor-pointer"
+              >
+                {user?.displayName?.charAt(0) || "A"}
+              </button>
+
+              {showProfileMenu && (
+                <div className="absolute right-0 top-12 w-64 bg-white rounded-xl shadow-2xl border border-slate-100 z-50 overflow-hidden">
+                  <div className="p-4 bg-[#006600] text-white">
+                    <div className="flex items-center gap-3">
+                      {user?.photoURL ? (
+                        <img 
+                          src={user.photoURL} 
+                          alt="Profile"
+                          className="w-10 h-10 rounded-full border-2 border-white object-cover"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-[#006600] font-bold">
+                          {user?.displayName?.charAt(0) || "A"}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-sm truncate">
+                          {user?.displayName}
+                        </p>
+                        <p className="text-green-200 text-[10px] truncate mb-1">
+                          {user?.email}
+                        </p>
+                        <span className="text-[9px] bg-[#D4AF37] text-white px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider">
+                          Administrator
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-2">
+                    <Link 
+                      href="/admin/settings"
+                      onClick={() => setShowProfileMenu(false)}
+                      className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 transition text-slate-700"
+                    >
+                      <Settings className="h-4 w-4 text-[#006600]" />
+                      <span className="text-sm font-medium">Settings</span>
+                    </Link>
+
+                    <Link 
+                      href="/admin/users"
+                      onClick={() => setShowProfileMenu(false)}
+                      className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 transition text-slate-700"
+                    >
+                      <Users className="h-4 w-4 text-[#006600]" />
+                      <span className="text-sm font-medium">Manage Users</span>
+                    </Link>
+
+                    <div className="border-t border-slate-100 my-1"/>
+
+                    <button
+                      onClick={async () => {
+                        setShowProfileMenu(false);
+                        await signOut(auth);
+                        router.replace("/");
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 transition text-red-500"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <span className="text-sm font-medium">Sign Out</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
